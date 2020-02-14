@@ -1,4 +1,0 @@
-- rewrite model with correlation matrix
-- add 3rd party step before hand
-- add weighting correction
-- better prior
