@@ -48,29 +48,30 @@ all_polls <- all_polls %>%
     dplyr::select(state, pollster, number.of.observations, population, mode, 
                   start.date, 
                   end.date,
-                  clinton, trump, undecided, other, johnson, mcmullin)
+                  clinton, trump, undecided, other, johnson, mcmullin,
+                  entry.date.time..et.)
 
 
-# make sure we've got nothing from the futuree
+# make sure we've got nothing from the future, lol
 all_polls <- all_polls %>%
-    filter(ymd(end.date) <= RUN_DATE)
+    filter(entry.date.time..et. <= RUN_DATE)
 
 
-# basic mutations
+# mutations
 df <- all_polls %>% 
     tbl_df %>%
-    rename(n = number.of.observations) %>%
-    mutate(begin = ymd(start.date),
-           end   = ymd(end.date),
-           t = end - (1 + as.numeric(end-begin)) %/% 2) %>%
+    rename(pop = number.of.observations,
+           vtype = population,
+           method = mode) %>%
+    mutate(begin = as.Date(start.date),
+           end   = as.Date(end.date),
+           t = end - (1 + as.numeric(end-begin)) %/% 2,
+           entry_date = entry.date.time..et. %>% substr(1,10) %>% as.Date) %>%
     filter(t >= start_date & !is.na(t)
-           & (population == "Likely Voters" | 
-                  population == "Registered Voters" | 
-                  population == "Adults") # get rid of disaggregated polls
-           & n > 1) 
-
-# pollster mutations
-df <- df %>%
+           & (vtype == "Likely Voters" | 
+                  vtype == "Registered Voters" | 
+                  vtype == "Adults") # This is to get rid of rows showing disaggregated polls by party ID.
+           & pop > 1) %>%
     mutate(pollster = str_extract(pollster, pattern = "[A-z0-9 ]+") %>% sub("\\s+$", "", .),
            pollster = replace(pollster, pollster == "Fox News", "FOX"), # Fixing inconsistencies in pollster names
            pollster = replace(pollster, pollster == "WashPost", "Washington Post"),
@@ -78,55 +79,43 @@ df <- df %>%
            undecided = ifelse(is.na(undecided), 0, undecided),
            other = ifelse(is.na(other), 0, other) + 
                ifelse(is.na(johnson), 0, johnson) + 
-               ifelse(is.na(mcmullin), 0, mcmullin))
-
-# vote shares etc
-df <- df %>%
-    mutate(two_party_sum = clinton + trump,
-           polltype = as.integer(as.character(recode(population, 
-                                                     "Likely Voters" = "0", 
+               ifelse(is.na(mcmullin), 0, mcmullin),
+           sum = clinton + trump,
+           week = floor_date(t - days(2), unit = "week") + days(2), # weeks start on Tuesdays.
+           day_of_week = as.integer(t - week), # number of days since beginnning of the week
+           # Trick to keep "likely voter" polls when multiple results are reported.
+           polltype = as.integer(as.character(recode(vtype, "Likely Voters" = "0", 
                                                      "Registered Voters" = "1",
                                                      "Adults" = "2"))), 
-           n_respondents = round(n),
-           n_clinton = round(n * clinton/100),
+           n_respondents = round(pop),
+           n_clinton = round(pop * clinton/100),
            p_clinton = clinton/100,
-           n_trump = round(n * trump/100),
+           n_trump = round(pop * trump/100),
            p_trump = trump/100,
-           n_other = round(n * other/100),
-           p_other = other/100)
-    
-# Numerical indices passed to Stan for states, days, weeks, pollsters
-df <- df %>% 
-    mutate(week = floor_date(t - days(2), unit = "week") + days(2), # weeks start on Tuesdays.
-           day_of_week = as.integer(t - week), # number of days since beginnning of the week
+           n_other = round(pop * other/100),
+           p_other = other/100,
+           # Numerical indices passed to Stan for states, days, weeks, pollsters
            index_s = as.numeric(as.factor(as.character(state))), 
            # Factors are alphabetically sorted: 1 = --, 2 = AL, 3 = AK, 4 = AZ...
            index_t = 1 + as.numeric(t) - min(as.numeric(t)),
            index_w = as.numeric(as.factor(week)),
-           index_p = as.numeric(as.factor(as.character(pollster))))  
-
-# selections
-df <- df %>%
-    arrange(state, t, polltype, two_party_sum) %>% 
+           index_p = as.numeric(as.factor(as.character(pollster))))  %>%
+    arrange(state, t, polltype, sum) %>% 
     distinct(state, t, pollster, .keep_all = TRUE) %>%
-    select(
-        # poll information
-        state, t, begin, end, pollster, polltype, method = mode, n_respondents, 
-        # vote sahres
-        p_clinton, n_clinton, 
-        p_trump, n_trump, 
-        p_other, n_other,
-        # indecies
-        week, day_of_week, starts_with("index_")) 
+    select(state, t, begin, end, entry_date, pollster, polltype, method, 
+           n_respondents, p_clinton, n_clinton, p_trump, n_trump, p_other, n_other,
+           week, day_of_week, starts_with("index_")) 
 
 
 
 # Print today's snapshot! -------------------------------------------------
 print("New polls today:")
-df %>% filter(end >= RUN_DATE-1) %>% select(-polltype, -t, -method, -n_clinton)
-cat(sprintf('%s total polls',nrow(df)))
+df %>% filter(entry_date >= RUN_DATE-1) %>% select(-polltype, -t, -method, -n_clinton)
+cat(nrow(df), "rows in data frame\n")
 
 # Removing overlapping polls ---------
+print(nrow(df))
+
 df$overlap_with_prev <- TRUE
 
 while(any(df$overlap_with_prev == TRUE)){
@@ -152,13 +141,13 @@ while(any(df$overlap_with_prev == TRUE)){
         ) %>%
         filter(drop_poll == FALSE) %>%
         ungroup
-    
     # The while loop keeps going until no overlap is found.
-    #print(nrow(df))
+    print(nrow(df))
 }
 
 
 # Useful vectors ---------
+
 all_polled_states <- df$state %>% unique %>% sort
 ndays <- max(df$t) - min(df$t)
 all_t <- min(df$t) + days(0:(ndays))
@@ -168,6 +157,7 @@ week_for_all_t <- floor_date(all_t - days(2), unit="week") + days(2)
 all_weeks <- (floor_date(all_t - days(2), unit = "week") + days(2)) %>% unique # weeks start on Tuesdays
 all_weeks_until_election <- (floor_date(all_t_until_election - days(2), unit = "week") + days(2)) %>% unique
 all_pollsters <- levels(as.factor(as.character(df$pollster)))
+
 
 
 # Reading 2012 election data to --------- 
@@ -183,7 +173,6 @@ states2012 <- read.csv("data/2012.csv",
            share_national_vote = (total_count*(1+adult_pop_growth_2011_15))
            /sum(total_count*(1+adult_pop_growth_2011_15))) %>%
     arrange(state)
-
 rownames(states2012) <- states2012$state
 
 prior_diff_score <- states2012[all_polled_states[-1],]$diff_score
@@ -196,11 +185,14 @@ all_states <- states2012$state
 state_name <- states2012$state_name
 names(state_name) <- states2012$state
 
-# electoral votes, by state:
+# Electoral votes, by state:
+
 ev_state <- states2012$ev
 names(ev_state) <- states2012$state
 
-# unique date indices for days in which national polls were conducted ---------
+# Unique date indices for days in which national polls were conducted ---------
+
+
 # See the Stan model: trying to speed up computation of the likelihood by calculating
 # the weighted mean of state latent vote intentions only for days national polls were conducted.
 
@@ -228,7 +220,6 @@ mu_b_prior <- logit(0.486 + c("--" = 0, prior_diff_score))
 score_among_polled <- sum(states2012[all_polled_states[-1],]$obama_count)/
     sum(states2012[all_polled_states[-1],]$obama_count + 
             states2012[all_polled_states[-1],]$romney_count)
-
 alpha_prior <- log(states2012$national_score[1]/score_among_polled)
 
 # prior on state-level correlation of means in reverse random walk
@@ -238,6 +229,9 @@ sigma_mu_b_end <- cov_matrix(n = length(mu_b_prior) - 1, sigma2 = 1/20, rho = 0.
 sigma_walk_b_forecast <- cov_matrix(length(mu_b_prior) - 1, 7*(0.015)^2, 0.75)
 
 # correlation of state-level polling error
+# sigma_poll_error <- cov_matrix(length(mu_b_prior) - 1, 0.08^2, .7) # About 0.08 = 2% sd on inv_logit scale; 0.04 = 1%
+# sigma_poll_error <- cov_matrix(length(mu_b_prior) - 1, 0.05^2, .7) # = 1.25% sd = 1% mean absolute deviation (see: http://researchdmr.com/ProbabilityTotalError.pdf)
+
 sigma_poll_error <- cov_matrix(length(mu_b_prior) - 1, 0.08^2, .8) # bump the error to 2.75% and correlation to 0.8
 
 

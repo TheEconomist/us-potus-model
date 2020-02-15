@@ -11,3 +11,8 @@ Improving on Kremp/Gelman's implementation of Linzer's dynamic linear model.
 - [ ] add 3rd party step 
 - [ ] add correction for partisan survey composition
 - [ ] find a better prior (approval/favorability lm)
+
+
+## Model design
+
+[See Kremp's original description...](model_description.html)
