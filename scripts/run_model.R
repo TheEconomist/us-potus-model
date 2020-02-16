@@ -69,6 +69,7 @@ df <- all_polls %>%
                   population == "Adults") # get rid of disaggregated polls
            & n > 1) 
 
+
 # pollster mutations
 df <- df %>%
     mutate(pollster = str_extract(pollster, pattern = "[A-z0-9 ]+") %>% sub("\\s+$", "", .),
@@ -80,6 +81,7 @@ df <- df %>%
                ifelse(is.na(johnson), 0, johnson) + 
                ifelse(is.na(mcmullin), 0, mcmullin))
 
+
 # vote shares etc
 df <- df %>%
     mutate(two_party_sum = clinton + trump,
@@ -88,12 +90,9 @@ df <- df %>%
                                                      "Registered Voters" = "1",
                                                      "Adults" = "2"))), 
            n_respondents = round(n),
-           n_clinton = round(n * clinton/100),
-           p_clinton = clinton/100,
-           n_trump = round(n * trump/100),
-           p_trump = trump/100,
-           n_other = round(n * other/100),
-           p_other = other/100)
+           n_clinton = round(n *(two_party_sum/100)* clinton/100),
+           p_clinton = (clinton/two_party_sum))
+
     
 # Numerical indices passed to Stan for states, days, weeks, pollsters
 df <- df %>% 
@@ -104,6 +103,7 @@ df <- df %>%
            index_t = 1 + as.numeric(t) - min(as.numeric(t)),
            index_w = as.numeric(as.factor(week)),
            index_p = as.numeric(as.factor(as.character(pollster))))  
+
 
 # selections
 df <- df %>%
@@ -241,8 +241,20 @@ sigma_walk_b_forecast <- cov_matrix(length(mu_b_prior) - 1, 7*(0.015)^2, 0.75)
 sigma_poll_error <- cov_matrix(length(mu_b_prior) - 1, 0.08^2, .8) # bump the error to 2.75% and correlation to 0.8
 
 
+# or, we could read in a correlation matrix for all these?
+state_corr_matrix <- read_csv('data/state_correlation_matrix.csv')
+
+# filter to states that have been polled?
+names(state_corr_matrix)[names(state_corr_matrix) %in% all_polled_states]
+
+# substitute? this isn't going to work until we add in the national vote share as varying, too.
+# sigma_mu_b_end <- state_corr_matrix %>% as.matrix() 
+# sigma_walk_b_forecast <- state_corr_matrix %>% as.matrix() 
+# sigma_poll_error <- state_corr_matrix %>% as.matrix() 
+
+
 # Passing the data to Stan and running the model ---------
-out <- stan("state and national polls.stan", 
+out <- stan("scripts/poll_model.stan", 
             data = list(N = nrow(df),                  # Number of polls
                         S = max(df$index_s),           # Number of states
                         T = length(all_t_until_election),           # Number of days
@@ -269,11 +281,11 @@ out <- stan("state and national polls.stan",
                         week = as.integer(as.factor(week_for_all_t)),
                         day_of_week = as.integer(all_t - week_for_all_t)),
             refresh=1,
-            chains = 4, iter = 1000,warmup=500
+            chains = 4, iter = 1000, warmup=500
             )
 
 write_rds(out,sprintf('models/stan_model_%s.rds',RUN_DATE),compress = 'gz')
-#out <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
+# out <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
 
 
 stan_summary <- capture.output(print(out, pars = c("alpha", "sigma_c", 
