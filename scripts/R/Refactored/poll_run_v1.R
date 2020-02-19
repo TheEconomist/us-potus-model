@@ -3,7 +3,7 @@
 
 ## Setup
 rm(list = ls())
-options(mc.cores = parallel::detectCores())
+#options(mc.cores = parallel::detectCores())
 
 ## Libraries
 {
@@ -31,8 +31,8 @@ start_date <- as.Date("2016-03-01") # Keeping all polls after March 1, 2016
 
 # wrangle polls -----------------------------------------------------------
 # read
-here("data")
-all_polls <- read.csv("data/all_polls.csv", stringsAsFactors = FALSE, header = TRUE)
+setwd(here("data/"))
+all_polls <- read.csv("all_polls.csv", stringsAsFactors = FALSE, header = TRUE)
 
 
 # select relevant columns from HufFPost polls
@@ -95,9 +95,14 @@ df <- df %>%
       # create correlation matrix ---------------------------------------------
 
 here("data")
-polls_2012 <- read.csv("2012.csv")
+polls_2012 <- read.csv("potus_results_76_16.csv")
+polls_2012 <- polls_2012 %>% 
+  filter(state != "DC") %>%
+  select(year, state, dem) %>%
+  spread(state, dem) %>% select(-year)
+state_correlation <- cor(polls_2012)  
+state_correlation <- make.positive.definite(state_correlation)  
 
-    
 # Numerical indices passed to Stan for states, days, weeks, pollsters
 df <- df %>% 
     mutate(poll_day = t - min(t) + 1,
@@ -117,7 +122,8 @@ df <- df %>%
         # vote sahres
         p_clinton, n_clinton, 
         p_trump, n_trump, 
-        p_other, n_other, poll_day, index_s, index_p, index_t) 
+        p_other, n_other, poll_day, index_s, index_p, index_t) %>%
+  mutate(index_s = ifelse(index_s == 1, 51, index_s - 1))
 
 # Useful vectors ---------
 all_polled_states <- df$state %>% unique %>% sort
@@ -128,25 +134,12 @@ all_t_until_election <- min(all_t) + days(0:(election_day - min(all_t)))
 all_pollsters <- levels(as.factor(as.character(df$pollster)))
 
 
-
-
-# Correlation matrix ---------
-state_correlation <- read.csv("data/state_correlation_matrix.csv")
-  # remove DC
-keep_cells <- !names(state_correlation) %in% "DC"
-state_correlation <- state_correlation[keep_cells, keep_cells]
-state_correlation <- as.matrix(state_correlation)
-
-
-
-
-
 # Reading 2012 election data to --------- 
 # (1) set priors on mu_b and alpha,
 # (2) get state_weights,           
 # (3) get state_names and EV        
-
-states2012 <- read.csv("data/2012.csv", 
+setwd(here("data/"))
+states2012 <- read.csv("2012.csv", 
                        header = TRUE, stringsAsFactors = FALSE) %>% 
     mutate(score = obama_count / (obama_count + romney_count),
            national_score = sum(obama_count)/sum(obama_count + romney_count),
@@ -217,10 +210,13 @@ current_T <- max(df$poll_day)
 ss_correlation <- state_correlation
 
 prior_sigma_measure_noise <- 0.1
+prior_sigma_a <- 0.1
+prior_sigma_b <- 0.1
 mu_b_prior <- mu_b_prior
 prior_sigma_mu_c <- 0.1
 mu_alpha <- alpha_prior
-sigma_alpha <- 0.1
+sigma_alpha <- 0.2
+prior_sigma_mu_c <- 0.1
 
 data <- list(
   N = N,
@@ -234,18 +230,20 @@ data <- list(
   n_democrat = n_democrat,
   n_respondents = n_respondents,
   current_T = as.integer(current_T),
-  ss_correlation = ss_correlation,
+  ss_correlation = state_correlation,
   prior_sigma_measure_noise = prior_sigma_measure_noise,
+  prior_sigma_a = prior_sigma_a,
+  prior_sigma_b = prior_sigma_b,
   mu_b_prior = mu_b_prior,
   prior_sigma_mu_c = prior_sigma_mu_c,
   mu_alpha = mu_alpha,
   sigma_alpha = sigma_alpha
 )
-
-model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v1.stan")
+setwd(here("scripts/Stan/Refactored/"))
+model <- rstan::stan_model("poll_model_v1.stan")
 out <- rstan::sampling(model, data = data,
-            refresh=1,
-            chains = 4, iter = 1000,warmup=500
+            refresh=100,
+            chains = 3, iter = 1000,warmup=500
             )
 
 
