@@ -165,10 +165,11 @@ all_t <- min(df$t) + days(0:(ndays))
 all_t_until_election <- min(all_t) + days(0:(election_day - min(all_t)))
 week_for_all_t <- floor_date(all_t - days(2), unit="week") + days(2)
 
-all_weeks <- (floor_date(all_t - days(2), unit = "week") + days(2)) %>% unique # weeks start on Tuesdays
-all_weeks_until_election <- (floor_date(all_t_until_election - days(2), unit = "week") + days(2)) %>% unique
 all_pollsters <- levels(as.factor(as.character(df$pollster)))
 
+
+# Correlation matrix ---------
+state_correlation <- read.csv("data/state_correlation_matrix.csv"
 
 # Reading 2012 election data to --------- 
 # (1) set priors on mu_b and alpha,
