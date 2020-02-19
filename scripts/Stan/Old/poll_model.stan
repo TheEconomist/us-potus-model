@@ -136,43 +136,43 @@ model{
     n_clinton ~ binomial_logit(n_respondents, logit_clinton_hat);
 }
 
-// generated quantities{
-//     matrix[last_tuesday + W - last_poll_W, S] predicted_score;
-//     // Predicted scores have *daily* values for past dates (since they depend on mu_b AND mu_a parameters), 
-//     // but *weekly* values for future dates (since they only depend on mu_b).
-//     for (state in 2:S){
-//         // Backward estimates (daily)
-//         for (date in 1:last_tuesday){
-//             // Linear interpolation of mu_b values between previous and current week, 
-//             // or current and next week
-//             // Using the following weights, depending on day_of_week:
-//             //         w-1    w       w+1
-//             // 0 Tue   3/7    4/7  
-//             // 1 Wed   2/7    5/7  
-//             // 2 Thu   1/7    6/7  
-//             // 3 Fri   0      7/7  
-//             // 4 Sat          6/7    1/7 
-//             // 5 Sun          5/7    2/7 
-//             // 6 Mon          4/7    3/7 
-//             if (day_of_week[date] <= 3){ // 0=Sun, 1=Mon, 2=Tue, 3=Wed
-//                 predicted_score[date, state] = 
-//                            inv_logit(mu_a[date] + (1.0-(4+day_of_week[date])/7.0)*mu_b[max(week[date]-1, 1), state]
-//                                                 +     ((4+day_of_week[date])/7.0)*mu_b[week[date], state]);
-//             }
-//             else{ // 4=Thu, 5=Fri, 6=Sat
-//                 predicted_score[date, state] = // Linear interpolation between current and next week
-//                            inv_logit(mu_a[date] +     ((10-day_of_week[date])/7.0)*mu_b[week[date], state]
-//                                                 + (1.0-(10-day_of_week[date])/7.0)*mu_b[min(week[date]+1, W), state]);
-//             }
-//             // predicted_score[date, state] = // Just a little bit of linear interpolation between weeks
-//             //            inv_logit(mu_a[date] + (1.0-day_of_week[date]/7.0)*mu_b[week[date], state]
-//             //                                 +     (day_of_week[date]/7.0)*mu_b[min(week[date]+1, W), state]);
-//         }
-//         // Forward estimates (weekly)
-//         for (date in (last_tuesday+1):(last_tuesday + W - last_poll_W))
-//             predicted_score[date, state] = inv_logit(mu_b[last_poll_W + date - last_tuesday, state]);
-//     }
-//     for (date in 1:(last_tuesday + W - last_poll_W))
-//         // National score: averaging state scores by state weights.
-//         predicted_score[date, 1] = predicted_score[date, 2:S] * state_weights[2:S];
-// }
+generated quantities{
+    matrix[last_tuesday + W - last_poll_W, S] predicted_score;
+    // Predicted scores have *daily* values for past dates (since they depend on mu_b AND mu_a parameters),
+    // but *weekly* values for future dates (since they only depend on mu_b).
+    for (state in 2:S){
+        // Backward estimates (daily)
+        for (date in 1:last_tuesday){
+            // Linear interpolation of mu_b values between previous and current week,
+            // or current and next week
+            // Using the following weights, depending on day_of_week:
+            //         w-1    w       w+1
+            // 0 Tue   3/7    4/7
+            // 1 Wed   2/7    5/7
+            // 2 Thu   1/7    6/7
+            // 3 Fri   0      7/7
+            // 4 Sat          6/7    1/7
+            // 5 Sun          5/7    2/7
+            // 6 Mon          4/7    3/7
+            if (day_of_week[date] <= 3){ // 0=Sun, 1=Mon, 2=Tue, 3=Wed
+                predicted_score[date, state] =
+                           inv_logit(mu_a[date] + (1.0-(4+day_of_week[date])/7.0)*mu_b[max(week[date]-1, 1), state]
+                                                +     ((4+day_of_week[date])/7.0)*mu_b[week[date], state]);
+            }
+            else{ // 4=Thu, 5=Fri, 6=Sat
+                predicted_score[date, state] = // Linear interpolation between current and next week
+                           inv_logit(mu_a[date] +     ((10-day_of_week[date])/7.0)*mu_b[week[date], state]
+                                                + (1.0-(10-day_of_week[date])/7.0)*mu_b[min(week[date]+1, W), state]);
+            }
+            // predicted_score[date, state] = // Just a little bit of linear interpolation between weeks
+            //            inv_logit(mu_a[date] + (1.0-day_of_week[date]/7.0)*mu_b[week[date], state]
+            //                                 +     (day_of_week[date]/7.0)*mu_b[min(week[date]+1, W), state]);
+        }
+        // Forward estimates (weekly)
+        for (date in (last_tuesday+1):(last_tuesday + W - last_poll_W))
+            predicted_score[date, state] = inv_logit(mu_b[last_poll_W + date - last_tuesday, state]);
+    }
+    for (date in 1:(last_tuesday + W - last_poll_W))
+        // National score: averaging state scores by state weights.
+        predicted_score[date, 1] = predicted_score[date, 2:S] * state_weights[2:S];
+}
