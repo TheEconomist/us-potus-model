@@ -15,4 +15,4 @@ Improving on Kremp/Gelman's implementation of Linzer's dynamic linear model.
 
 ## Model design
 
-[See Kremp's original description...](model_description.html)
+[See Kremp's original description...](http://www.slate.com/features/pkremp_forecast/report.html)
