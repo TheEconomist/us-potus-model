@@ -20,6 +20,7 @@ library(gridExtra, quietly = TRUE)
 library(pbapply, quietly = TRUE)
 library(here, quietly = TRUE)
 library(boot, quietly = TRUE)
+library(lqmm)
 }
   
 ## Master variables
@@ -218,6 +219,8 @@ mu_alpha <- alpha_prior
 sigma_alpha <- 0.2
 prior_sigma_mu_c <- 0.1
 
+
+
 data <- list(
   N = N,
   T = T,
@@ -239,11 +242,34 @@ data <- list(
   mu_alpha = mu_alpha,
   sigma_alpha = sigma_alpha
 )
+
+### Initialization ----
+
+n_chains <- 3
+initf2 <- function(chain_id = 1) {
+  # cat("chain_id =", chain_id, "\n")
+  list(raw_alpha = abs(rnorm(1)), 
+       raw_mu_a = rnorm(current_T),
+       raw_mu_b = abs(matrix(rnorm(T * (S - 1)), nrow = T, ncol = (S - 1))),
+       raw_mu_c = abs(rnorm(P)),
+       measure_noise = abs(rnorm(N)),
+       raw_polling_error = abs(rnorm(S - 1)),
+       sigma_measure_noise_national = abs(rnorm(1, 0, prior_sigma_measure_noise / 2)),
+       sigma_measure_noise_state = abs(rnorm(1, 0, prior_sigma_measure_noise / 2)),
+       sigma_mu_c = abs(rnorm(1, 0, prior_sigma_mu_c / 2)),
+       sigma_mu_a = abs(rnorm(1, 0, prior_sigma_a / 2)),
+       sigma_mu_b = abs(rnorm(1, 0, prior_sigma_b /2))
+  )
+}
+init_ll <- lapply(1:n_chains, function(id) initf2(chain_id = id))
+
+### Run ----
+
 setwd(here("scripts/Stan/Refactored/"))
-model <- rstan::stan_model("poll_model_v1.stan")
+model <- rstan::stan_model("poll_model_v2.stan")
 out <- rstan::sampling(model, data = data,
             refresh=100,
-            chains = 3, iter = 1000,warmup=500
+            chains = 3, iter = 1000,warmup=500, init = init_ll
             )
 
 
