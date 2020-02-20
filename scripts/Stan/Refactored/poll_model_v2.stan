@@ -42,17 +42,17 @@ parameters {
     // alpha
   real raw_alpha;             
     // mu_a
-  real<lower = 0, upper = prior_sigma_a> sigma_a;
+  real<lower = 0> sigma_a;
   real raw_mu_a[current_T];
     // mu_b
-  real<lower = 0, upper = prior_sigma_b> sigma_b;
+  real<lower = 0> sigma_b;
   real raw_mu_b[T, S - 1]; // S state-specific components at time T
     // mu_c
-  real<lower = 0, upper = prior_sigma_mu_c> sigma_mu_c;
+  real<lower = 0> sigma_mu_c;
   vector[P] raw_mu_c;
     // u = measurement noise
-  real <lower = 0, upper = prior_sigma_measure_noise> sigma_measure_noise_state;
-  real <lower = 0, upper = prior_sigma_measure_noise> sigma_measure_noise_national;
+  real <lower = 0> sigma_measure_noise_state;
+  real <lower = 0> sigma_measure_noise_national;
   vector[N] measure_noise;
   // e polling error
   vector[S - 1] raw_polling_error;  // S state-specific polling errors (raw)
@@ -125,15 +125,17 @@ model {
     // alpha
   target += std_normal_lpdf(raw_alpha);
     // mu_a
-  target += uniform_lpdf(sigma_a | 0, prior_sigma_a);
+  target += normal_lpdf(sigma_a | 0, prior_sigma_a / 2);
   target += std_normal_lpdf(raw_mu_a);
     // mu_b
-  target += uniform_lpdf(sigma_b | 0, prior_sigma_b);
+  target += normal_lpdf(sigma_b | 0, prior_sigma_b / 2);
   for (s_id in 1:(S - 1)) target += std_normal_lpdf(mu_b[:, s_id]);
     // mu_c
-  target += uniform_lpdf(sigma_mu_c | 0, prior_sigma_mu_c);
+  target += normal_lpdf(sigma_mu_c | 0, prior_sigma_mu_c / 2);
   target += std_normal_lpdf(raw_mu_c);
     // measurement noise
+  target += normal_lpdf(sigma_measure_noise_state | 0, prior_sigma_measure_noise / 2);
+  target += normal_lpdf(sigma_measure_noise_national | 0, prior_sigma_measure_noise / 2);
   target += std_normal_lpdf(measure_noise);
   //*** likelihood
   target += binomial_logit_lpmf(n_democrat | n_respondents, pi_democrat);
