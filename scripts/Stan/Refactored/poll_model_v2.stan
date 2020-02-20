@@ -105,7 +105,7 @@ transformed parameters {
       // alpha              = discrepancy adjustment
       // mu_c               = polling house effect
       // measure_noise      = noise of the individual poll
-      pi_democrat[i] = sum_average_states[day[i]] + alpha + mu_c[poll[i]] + sigma_measure_noise_national * measure_noise[i];
+      pi_democrat[i] = logit(sum_average_states[day[i]]) + alpha + mu_c[poll[i]] + sigma_measure_noise_national * measure_noise[i];
     } else {
       // state-level
       // mu_a               = national component
