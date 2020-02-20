@@ -42,3 +42,9 @@ vignettes/*.pdf
 .DS_Store
 
 .Rproj.user
+
+# big model files
+.rds
+*.rds
+.RData
+*.Rdata
