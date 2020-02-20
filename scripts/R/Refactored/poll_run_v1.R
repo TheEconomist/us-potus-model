@@ -3,7 +3,7 @@
 
 ## Setup
 rm(list = ls())
-#options(mc.cores = parallel::detectCores())
+options(mc.cores = parallel::detectCores())
 
 ## Libraries
 {
@@ -20,7 +20,7 @@ library(gridExtra, quietly = TRUE)
 library(pbapply, quietly = TRUE)
 library(here, quietly = TRUE)
 library(boot, quietly = TRUE)
-library(lqmm)
+library(lqmm, quietly = TRUE)
 }
   
 ## Master variables
@@ -81,10 +81,13 @@ df <- df %>%
                                                      "Registered Voters" = "1",
                                                      "Adults" = "2"))), 
            n_respondents = round(n),
+           # clinton
            n_clinton = round(n * clinton/100),
-           p_clinton = clinton/100,
+           p_clinton = clinton/two_party_sum,
+           # trump
            n_trump = round(n * trump/100),
-           p_trump = trump/100,
+           p_trump = trump/two_party_sum,
+           # third-party
            n_other = round(n * other/100),
            p_other = other/100)
     
@@ -102,7 +105,7 @@ polls_2012 <- polls_2012 %>%
   select(year, state, dem) %>%
   spread(state, dem) %>% select(-year)
 state_correlation <- cor(polls_2012)  
-state_correlation <- make.positive.definite(state_correlation)  
+state_correlation <- lqmm::make.positive.definite(state_correlation)  
 
 # Numerical indices passed to Stan for states, days, weeks, pollsters
 df <- df %>% 
@@ -120,7 +123,7 @@ df <- df %>%
     select(
         # poll information
         state, t, begin, end, pollster, polltype, method = mode, n_respondents, 
-        # vote sahres
+        # vote shares
         p_clinton, n_clinton, 
         p_trump, n_trump, 
         p_other, n_other, poll_day, index_s, index_p, index_t) %>%
@@ -182,7 +185,7 @@ names(ev_state) <- states2012$state
 
 # Mean of the mu_b_prior
 # 0.486 is the predicted Clinton share of the national vote according to the Time for Change model.
-mu_b_prior <- logit(0.486 + c(prior_diff_score))
+mu_b_prior <- logit(0.511 + c(prior_diff_score))
 
 # The model uses national polls to complement state polls when estimating the national term mu_a.
 # One problem until early September, was that voters in polled states were different from average voters :
@@ -246,6 +249,7 @@ data <- list(
 ### Initialization ----
 
 n_chains <- 3
+
 initf2 <- function(chain_id = 1) {
   # cat("chain_id =", chain_id, "\n")
   list(raw_alpha = abs(rnorm(1)), 
@@ -261,14 +265,17 @@ initf2 <- function(chain_id = 1) {
        sigma_mu_b = abs(rnorm(1, 0, prior_sigma_b /2))
   )
 }
+
 init_ll <- lapply(1:n_chains, function(id) initf2(chain_id = id))
 
 ### Run ----
 
 setwd(here("scripts/Stan/Refactored/"))
+
 model <- rstan::stan_model("poll_model_v2.stan")
+
 out <- rstan::sampling(model, data = data,
-            refresh=100,
+            refresh=10,
             chains = 3, iter = 1000,warmup=500, init = init_ll
             )
 
