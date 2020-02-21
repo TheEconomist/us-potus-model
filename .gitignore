@@ -44,7 +44,4 @@ vignettes/*.pdf
 .Rproj.user
 
 # big model files
-.rds
-*.rds
-.RData
-*.Rdata
+

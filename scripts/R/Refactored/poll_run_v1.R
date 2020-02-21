@@ -7,20 +7,22 @@ rm(list = ls())
 
 ## Libraries
 {
-library(tidyverse, quietly = TRUE)
-library(rstan, quietly = TRUE)
-library(purrr, quietly = TRUE)
-library(stringr, quietly = TRUE)
-library(lubridate, quietly = TRUE)
-library(curl, quietly = TRUE)
-library(shinystan, quietly = TRUE)
-library(rmarkdown, quietly = TRUE)
-library(survey, quietly = TRUE)
-library(gridExtra, quietly = TRUE)
-library(pbapply, quietly = TRUE)
-library(here, quietly = TRUE)
-library(boot, quietly = TRUE)
-library(lqmm, quietly = TRUE)
+  library(tidyverse, quietly = TRUE)
+  library(rstan, quietly = TRUE)
+  library(purrr, quietly = TRUE)
+  library(stringr, quietly = TRUE)
+  library(lubridate, quietly = TRUE)
+  library(curl, quietly = TRUE)
+  library(shinystan, quietly = TRUE)
+  library(rmarkdown, quietly = TRUE)
+  library(survey, quietly = TRUE)
+  library(gridExtra, quietly = TRUE)
+  library(pbapply, quietly = TRUE)
+  library(here, quietly = TRUE)
+  library(boot, quietly = TRUE)
+  library(lqmm, quietly = TRUE)
+  library(caret, quietly = TRUE)
+  library(glmnet, quietly = TRUE)
 }
   
 ## Master variables
@@ -127,7 +129,7 @@ df <- df %>%
         p_clinton, n_clinton, 
         p_trump, n_trump, 
         p_other, n_other, poll_day, index_s, index_p, index_t) %>%
-  mutate(index_s = ifelse(index_s == 1, 51, index_s - 1))
+  mutate(index_s = ifelse(index_s == 1, 52, index_s - 1)) # national index = 51
 
 # Useful vectors ---------
 all_polled_states <- df$state %>% unique %>% sort
@@ -150,7 +152,7 @@ states2012 <- read.csv("2012.csv",
            delta = score - national_score,
            share_national_vote = (total_count*(1+adult_pop_growth_2011_15))
            /sum(total_count*(1+adult_pop_growth_2011_15))) %>%
-    arrange(state) %>% filter(state != "DC")
+    arrange(state) 
 
 rownames(states2012) <- states2012$state
 
@@ -168,15 +170,46 @@ names(state_name) <- states2012$state
 ev_state <- states2012$ev
 names(ev_state) <- states2012$state
 
-# unique date indices for days in which national polls were conducted ---------
-# See the Stan model: trying to speed up computation of the likelihood by calculating
-# the weighted mean of state latent vote intentions only for days national polls were conducted.
-
 # Creating priors ---------
+# read in abramowitz data
+setwd(here("data/"))
+abramowitz <- read.csv('abramowitz_data.csv') %>% filter(year != 2016)
+
+# train a caret model to predict demvote with incvote ~ q2gdp + juneapp + year:q2gdp + year:juneapp 
+prior_model <- caret::train(
+  incvote ~ q2gdp + juneapp + year:q2gdp + year:juneapp,
+  data = abramowitz,
+  method = "glmnet",
+  trControl = trainControl(
+    # 3-fold CV 
+    method = "cv", 
+    number = 5),
+  tuneLength = 50)
+
+
+# find the optimal parameters
+best = which(rownames(prior_model$results) == rownames(prior_model$bestTune))
+best_result = prior_model$results[best, ]
+rownames(best_result) = NULL
+best_result
+
+# make predictions
+national_mu_prior <- predict(prior_model,newdata = tibble(q2gdp = 1.1,
+                                                          juneapp = 4,
+                                                          year = 2016))
+
+
+cat(sprintf('Predicted clinton two-party vote is %s\nWith a standard error of %s',
+            round(national_mu_prior/100,3),round(best_result$RMSE/100,3)))
+
+# on correct scale
+national_mu_prior <- national_mu_prior / 100
+national_sigma_prior <- best_result$RMSE / 100
 
 # Mean of the mu_b_prior
-# 0.486 is the predicted Clinton share of the national vote according to the Time for Change model.
-mu_b_prior <- logit(0.511 + c(prior_diff_score))
+# 0.486 is the predicted Clinton share of the national vote according to the Lewis-Beck & Tien model
+# https://pollyvote.com/en/components/econometric-models/lewis-beck-tien/
+mu_b_prior <- logit(national_mu_prior + c("--" = 0, prior_diff_score))
 
 # The model uses national polls to complement state polls when estimating the national term mu_a.
 # One problem until early September, was that voters in polled states were different from average voters :
@@ -191,7 +224,7 @@ alpha_prior <- log(states2012$national_score[1]/score_among_polled)
 # Passing the data to Stan and running the model ---------
 N <- nrow(df)
 T <- T
-S <- 51
+S <- 52 # 51 + DC
 P <- length(unique(df$pollster))
 state <- df$index_s
 day <- df$poll_day
@@ -212,7 +245,6 @@ prior_sigma_mu_c <- 0.1
 mu_alpha <- alpha_prior
 sigma_alpha <- 0.2
 prior_sigma_mu_c <- 0.1
-
 
 
 data <- list(
