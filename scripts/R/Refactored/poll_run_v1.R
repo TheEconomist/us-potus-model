@@ -3,7 +3,7 @@
 
 ## Setup
 rm(list = ls())
-options(mc.cores = parallel::detectCores())
+#options(mc.cores = parallel::detectCores())
 
 ## Libraries
 {
@@ -171,15 +171,6 @@ names(ev_state) <- states2012$state
 # unique date indices for days in which national polls were conducted ---------
 # See the Stan model: trying to speed up computation of the likelihood by calculating
 # the weighted mean of state latent vote intentions only for days national polls were conducted.
-
-#unique_ts <- unique(df$index_t[df$state == "--"])
-
-#natpolls_indices <- data.frame(unique_ts = unique_ts)
-
-#df$index_t_unique <- sapply(1:nrow(df), 
-#                            function(i) ifelse(df$state[i] == "--", 
-#                                               which(natpolls_indices$unique_ts == df$index_t[i]), 
-#                                               0))
 
 # Creating priors ---------
 
