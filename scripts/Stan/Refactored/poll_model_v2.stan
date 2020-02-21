@@ -46,7 +46,7 @@ parameters {
   real raw_mu_a[current_T];
     // mu_b
   real<lower = 0> sigma_b;
-  real raw_mu_b[T, S - 1]; // S state-specific components at time T
+  vector[S - 1] raw_mu_b[T]; // S state-specific components at time T
     // mu_c
   real<lower = 0> sigma_mu_c;
   vector[P] raw_mu_c;
@@ -87,9 +87,9 @@ transformed parameters {
       // last (T)
   mu_b[T] = cholesky_ss_correlation * mu_b_prior;
       // forward from current poll (T - 1 to current_T)
-  for (t in 1:(T - current_T)) mu_b[T - t] = cholesky_ss_correlation * mu_b[T - t + 1];
+  for (t in 1:(T - current_T)) mu_b[T - t] = cholesky_ss_correlation * raw_mu_b[T - t] + mu_b[T - t + 1];
       // backward from current poll (current_T to 1)
-  for (t in 1:(current_T - 1)) mu_b[current_T - t] = mu_b[current_T - t + 1] * sigma_b * sqrt(7);
+  for (t in 1:(current_T - 1)) mu_b[current_T - t] = mu_b[current_T - t + 1] + raw_mu_b[current_T - t] * sigma_b;
     // mu_c
   mu_c = raw_mu_c * sigma_mu_c;
     // averages
@@ -114,7 +114,8 @@ transformed parameters {
       // measure_noise (u)  = state noise
       // polling_error (e)  = polling error term (state specific)
       pi_democrat[i] = mu_a[day[i]] + mu_b[day[i], state[i]] + 
-                       mu_c[poll[i]] + measure_noise[state[i]] + sigma_measure_noise_state * polling_error[state[i]];    
+                       mu_c[poll[i]] + measure_noise[state[i]] * 
+                       sigma_measure_noise_state + polling_error[state[i]];    
     }
   }
 }
@@ -129,7 +130,7 @@ model {
   target += std_normal_lpdf(raw_mu_a);
     // mu_b
   target += normal_lpdf(sigma_b | 0, prior_sigma_b / 2);
-  for (s_id in 1:(S - 1)) target += std_normal_lpdf(mu_b[:, s_id]);
+  for (s_id in 1:(S - 1)) target += std_normal_lpdf(raw_mu_b[:, s_id]);
     // mu_c
   target += normal_lpdf(sigma_mu_c | 0, prior_sigma_mu_c / 2);
   target += std_normal_lpdf(raw_mu_c);
@@ -140,3 +141,4 @@ model {
   //*** likelihood
   target += binomial_logit_lpmf(n_democrat | n_respondents, pi_democrat);
 }
+
