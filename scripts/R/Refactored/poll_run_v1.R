@@ -23,6 +23,7 @@ rm(list = ls())
   library(lqmm, quietly = TRUE)
   library(caret, quietly = TRUE)
   library(glmnet, quietly = TRUE)
+
 }
   
 ## Master variables
@@ -210,6 +211,7 @@ national_sigma_prior <- best_result$RMSE / 100
 # 0.486 is the predicted Clinton share of the national vote according to the Lewis-Beck & Tien model
 # https://pollyvote.com/en/components/econometric-models/lewis-beck-tien/
 mu_b_prior <- logit(national_mu_prior + c("--" = 0, prior_diff_score))
+
 
 
 # The model uses national polls to complement state polls when estimating the national term mu_a.
