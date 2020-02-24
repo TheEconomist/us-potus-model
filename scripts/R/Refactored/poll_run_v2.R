@@ -22,7 +22,7 @@ options(mc.cores = parallel::detectCores())
   library(boot, quietly = TRUE)
   library(lqmm, quietly = TRUE)
   library(caret, quietly = TRUE)
-  library(glmnet, quietly = TRUE)
+  #library(glmnetUtils, quietly = TRUE)
 }
 
 ## Master variables
@@ -187,7 +187,7 @@ abramowitz <- read.csv('data/abramowitz_data.csv') %>% filter(year != 2016)
 prior_model <- caret::train(
   incvote ~ q2gdp + juneapp + year:q2gdp + year:juneapp,
   data = abramowitz,
-  method = "glmnet",
+  #method = "glmnet",
   trControl = trainControl(
     # 3-fold CV 
     method = "cv", 
@@ -247,8 +247,8 @@ current_T <- max(df$poll_day)
 ss_correlation <- state_correlation
 
 prior_sigma_measure_noise <- 0.1
-prior_sigma_a <- 0.1
-prior_sigma_b <- 0.1
+prior_sigma_a <- 0.02
+prior_sigma_b <- 0.02
 mu_b_prior <- mu_b_prior
 prior_sigma_mu_c <- 0.1
 mu_alpha <- alpha_prior
@@ -305,13 +305,14 @@ init_ll <- lapply(1:n_chains, function(id) initf2(chain_id = id))
 #setwd(here("scripts/Stan/Refactored/"))
 
 # read model code
-model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v3.stan")
+model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v4.stan")
 
 # run model
 out <- rstan::sampling(model, data = data,
                        refresh=10,
-                       chains = 3, iter = 1000,warmup=500, init = init_ll
+                       chains = 2, iter = 1000,warmup=500, init = init_ll
 )
+
 
 # save model for today
 write_rds(out, sprintf('models/stan_model_%s.rds',RUN_DATE),compress = 'gz')
