@@ -46,8 +46,11 @@ vignettes/*.pdf
 # big model files
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 =======
+=======
+>>>>>>> 94b5a1969c3296855e44bcc2a4d025a1a247f293
 =======
 >>>>>>> 94b5a1969c3296855e44bcc2a4d025a1a247f293
 .rds
@@ -55,6 +58,9 @@ vignettes/*.pdf
 .RData
 *.Rdata
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> 94b5a1969c3296855e44bcc2a4d025a1a247f293
+=======
 >>>>>>> 94b5a1969c3296855e44bcc2a4d025a1a247f293
 =======
 >>>>>>> 94b5a1969c3296855e44bcc2a4d025a1a247f293
