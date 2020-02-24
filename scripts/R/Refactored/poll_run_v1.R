@@ -211,6 +211,7 @@ national_sigma_prior <- best_result$RMSE / 100
 # https://pollyvote.com/en/components/econometric-models/lewis-beck-tien/
 mu_b_prior <- logit(national_mu_prior + c("--" = 0, prior_diff_score))
 
+
 # The model uses national polls to complement state polls when estimating the national term mu_a.
 # One problem until early September, was that voters in polled states were different from average voters :
 # Several solid red states still hadn't been polled, the weighted average of state polls was slightly more pro-Clinton than national polls.
@@ -245,6 +246,7 @@ prior_sigma_mu_c <- 0.1
 mu_alpha <- alpha_prior
 sigma_alpha <- 0.2
 prior_sigma_mu_c <- 0.1
+
 
 
 data <- list(

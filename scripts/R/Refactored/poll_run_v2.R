@@ -314,7 +314,7 @@ out <- rstan::sampling(model, data = data,
 )
 
 # save model for today
-write_rds(out, sprintf('models/stan_model_%s',RUN_DATE),compress = 'gz')
+write_rds(out, sprintf('models/stan_model_%s.rds',RUN_DATE),compress = 'gz')
 
 ### Extract results ----
 # national vote
