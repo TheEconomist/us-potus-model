@@ -250,7 +250,7 @@ prior_sigma_measure_noise <- 0.1
 prior_sigma_a <- 0.02
 prior_sigma_b <- 0.02
 mu_b_prior <- mu_b_prior
-prior_sigma_mu_c <- 0.1
+prior_sigma_c <- 0.1
 mu_alpha <- alpha_prior
 sigma_alpha <- 0.2
 prior_sigma_mu_c <- 0.1
@@ -273,14 +273,14 @@ data <- list(
   prior_sigma_a = prior_sigma_a,
   prior_sigma_b = prior_sigma_b,
   mu_b_prior = mu_b_prior,
-  prior_sigma_mu_c = prior_sigma_mu_c,
+  prior_sigma_c = prior_sigma_c,
   mu_alpha = mu_alpha,
   sigma_alpha = sigma_alpha
 )
 
 ### Initialization ----
 
-n_chains <- 3
+n_chains <- 2
 
 initf2 <- function(chain_id = 1) {
   # cat("chain_id =", chain_id, "\n")
