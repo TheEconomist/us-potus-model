@@ -112,9 +112,11 @@ state_correlation <- lqmm::make.positive.definite(state_correlation)
 df <- df %>% 
   mutate(poll_day = t - min(t) + 1,
          # Factors are alphabetically sorted: 1 = --, 2 = AL, 3 = AK, 4 = AZ...
-         index_s = as.numeric(as.factor(as.character(state))), 
+         index_s = as.numeric(factor(as.character(state),
+                                     levels = c('--',colnames(state_correlation)))),  # ensure levels are same as all 50 names in sate_correlation
          index_t = 1 + as.numeric(t) - min(as.numeric(t)),
          index_p = as.numeric(as.factor(as.character(pollster))))  
+
 T <- as.integer(round(difftime(election_day, min(df$start.date))))
 
 # selections
@@ -185,13 +187,11 @@ abramowitz <- read.csv('data/abramowitz_data.csv') %>% filter(year != 2016)
 
 # train a caret model to predict demvote with incvote ~ q2gdp + juneapp + year:q2gdp + year:juneapp 
 prior_model <- caret::train(
-  incvote ~ q2gdp + juneapp + year:q2gdp + year:juneapp,
+  incvote ~ q2gdp + juneapp , #+ year:q2gdp + year:juneapp
   data = abramowitz,
   #method = "glmnet",
   trControl = trainControl(
-    # 3-fold CV 
-    method = "cv", 
-    number = 5),
+    method = "LOOCV"),
   tuneLength = 50)
 
 
