@@ -47,6 +47,7 @@ parameters {
   real raw_mu_a[current_T];
   // mu_b
   real<lower = 0> raw_sigma_b;
+  vector[S] raw_mu_b_T;
   matrix[S, T] raw_mu_b; // S state-specific components at time T
   // mu_c
   real<lower = 0> raw_sigma_c;
@@ -94,7 +95,7 @@ transformed parameters {
   // mu_b
   sigma_b = raw_sigma_b * prior_sigma_b / 2;
     // last (T)
-  mu_b[:,T] = cholesky_ss_correlation * mu_b_prior;
+  mu_b[:,T] = cholesky_ss_correlation * raw_mu_b_T + mu_b_prior;
     // forward from current poll (T - 1 to current_T)
   for (t in 1:(T - current_T)) mu_b[:,T - t] = cholesky_ss_correlation * raw_mu_b[:, T - t] + mu_b[:, T - t + 1];
     // backward from current poll (current_T to 1)
@@ -107,7 +108,7 @@ transformed parameters {
   sigma_measure_noise_state = raw_sigma_measure_noise_state * prior_sigma_measure_noise / 2;
   
   // averages
-  for (t in 1:current_T) sum_average_states[t] = rv_state_weights * (mu_b[:, t] + mu_a[t] + polling_error);
+  for (t in 1:current_T) sum_average_states[t] = rv_state_weights * (mu_b[:, t] + polling_error);
 
   //*** fill pi_democrat
   for (i in 1:N){
@@ -117,7 +118,7 @@ transformed parameters {
       // alpha              = discrepancy adjustment
       // mu_c               = polling house effect
       // measure_noise      = noise of the individual poll
-      pi_democrat[i] = sum_average_states[day[i]] + alpha + mu_c[poll[i]] + sigma_measure_noise_national * measure_noise[i];
+      pi_democrat[i] = mu_a[day[i]] * sum_average_states[day[i]] + alpha + mu_c[poll[i]] + sigma_measure_noise_national * measure_noise[i];
     } else {
       // state-level
       // mu_a               = national component
@@ -125,7 +126,7 @@ transformed parameters {
       // mu_c               = poll component
       // measure_noise (u)  = state noise
       // polling_error (e)  = polling error term (state specific)
-      pi_democrat[i] = mu_a[day[i]] + mu_b[state[i], day[i]] + mu_c[poll[i]] + measure_noise[i] * sigma_measure_noise_state + polling_error[state[i]];    
+      pi_democrat[i] = mu_a[day[i]] + mu_b[state[i], day[i]] + mu_c[poll[i]] + measure_noise[i] * sigma_measure_noise_state + polling_error[state[i]];
     }
   }
 }
@@ -138,6 +139,7 @@ model {
   raw_sigma_a ~ std_normal();
   raw_mu_a ~ std_normal_lpdf();
   // mu_b
+  raw_mu_b_T ~ std_normal();
   raw_sigma_b ~ std_normal();
   for (s in 1:T){
     raw_mu_b[:,s] ~ std_normal();  
