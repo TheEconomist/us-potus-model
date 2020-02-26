@@ -125,7 +125,7 @@ transformed parameters {
       // mu_c               = poll component
       // measure_noise (u)  = state noise
       // polling_error (e)  = polling error term (state specific)
-      pi_democrat[i] = mu_a[day[i]] + mu_b[state[i], day[i]] + mu_c[poll[i]] + measure_noise[state[i]] * sigma_measure_noise_state + polling_error[state[i]];    
+      pi_democrat[i] = mu_a[day[i]] + mu_b[state[i], day[i]] + mu_c[poll[i]] + measure_noise[i] * sigma_measure_noise_state + polling_error[state[i]];    
     }
   }
 }
@@ -149,6 +149,8 @@ model {
   raw_sigma_measure_noise_state ~ std_normal();
   raw_sigma_measure_noise_national ~ std_normal();
   measure_noise ~ std_normal();
+  // raw_polling_error
+  raw_polling_error ~ std_normal();
   //*** likelihood
   n_democrat ~ binomial_logit(n_respondents, pi_democrat);
 }
