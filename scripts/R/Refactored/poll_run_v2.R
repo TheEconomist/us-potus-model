@@ -233,7 +233,7 @@ alpha_prior <- log(states2012$national_score[1]/score_among_polled)
 # Passing the data to Stan and running the model ---------
 N <- nrow(df)
 T <- T
-S <- 52 # 51 + DC
+S <- 51
 P <- length(unique(df$pollster))
 state <- df$index_s
 day <- df$poll_day
@@ -246,14 +246,14 @@ n_respondents <- df$n_respondents
 current_T <- max(df$poll_day)
 ss_correlation <- state_correlation
 
-prior_sigma_measure_noise <- 0.1
-prior_sigma_a <- 0.02
-prior_sigma_b <- 0.02
+prior_sigma_measure_noise <- 0.05
+prior_sigma_a <- 0.01
+prior_sigma_b <- 0.01
 mu_b_prior <- mu_b_prior
-prior_sigma_c <- 0.1
+prior_sigma_c <- 0.01
 mu_alpha <- alpha_prior
-sigma_alpha <- 0.2
-prior_sigma_mu_c <- 0.1
+sigma_alpha <- 0.02
+prior_sigma_mu_c <- 0.01
 
 
 data <- list(
@@ -286,10 +286,10 @@ initf2 <- function(chain_id = 1) {
   # cat("chain_id =", chain_id, "\n")
   list(raw_alpha = abs(rnorm(1)), 
        raw_mu_a = rnorm(current_T),
-       raw_mu_b = abs(matrix(rnorm(T * (S - 1)), nrow = T, ncol = (S - 1))),
+       raw_mu_b = abs(matrix(rnorm(T * (S)), nrow = S, ncol = T)),
        raw_mu_c = abs(rnorm(P)),
        measure_noise = abs(rnorm(N)),
-       raw_polling_error = abs(rnorm(S - 1)),
+       raw_polling_error = abs(rnorm(S)),
        sigma_measure_noise_national = abs(rnorm(1, 0, prior_sigma_measure_noise / 2)),
        sigma_measure_noise_state = abs(rnorm(1, 0, prior_sigma_measure_noise / 2)),
        sigma_mu_c = abs(rnorm(1, 0, prior_sigma_mu_c / 2)),
@@ -305,7 +305,7 @@ init_ll <- lapply(1:n_chains, function(id) initf2(chain_id = id))
 #setwd(here("scripts/Stan/Refactored/"))
 
 # read model code
-model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v4.stan")
+model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v6.stan")
 
 # run model
 out <- rstan::sampling(model, data = data,
