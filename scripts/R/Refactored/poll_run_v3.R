@@ -336,72 +336,82 @@ out <- rstan::sampling(model, data = data,
 write_rds(out, sprintf('stan_model_%s.rds',RUN_DATE),compress = 'gz')
 
 ### Extract results ----
-# national vote
-mu_a <- rstan::extract(out, pars = "mu_a")[[1]]
+# etc
+a <- rstan::extract(out, pars = "alpha")[[1]]
 
-# state deviations
-mu_b <- rstan::extract(out, pars = "mu_b")[[1]]
+# extract predictions
+predicted_score <- rstan::extract(out, pars = "predicted_score")[[1]]
 
-# extend mu_a to full length of mu_b
-mu_a <- cbind(mu_a,
-      matrix(mu_a[,ncol(mu_a)], nrow = nrow(mu_a), ncol = (ncol(mu_b)-ncol(mu_a))))
-mu_a <- cbind(mu_a,
-      matrix(0, nrow = nrow(mu_a), ncol = (dim(mu_b)[3] - ncol(mu_a))))
+p_clinton <- pblapply(1:dim(predicted_score)[3],
+                       function(x){
+                         # pred is mu_a + mu_b for the past, just mu_b for the future
+                         p_clinton <- predicted_score[,,x]
+                         
+                         # put in tibble
+                         tibble(low = apply(p_clinton,2,function(x){(quantile(x,0.05))}),
+                                high = apply(p_clinton,2,function(x){(quantile(x,0.95))}),
+                                mean = apply(p_clinton,2,function(x){(mean(x))}),
+                                state = x) 
+                         
+                       }) %>% do.call('bind_rows',.)
 
-# prediction in any state is mu_b + mu_a
-draws <- lapply(1:dim(mu_b)[2],
-      function(x){
-        # get state mu_b
-        state_mu_b_draws <- mu_b[ , x, ]
-        
-        # add national mu_a and convert to inv.logit
-        mu_b_plus_a <- inv.logit(state_mu_b_draws + mu_a)
-        
-        # inv logit
-        mu_b_plus_a %>%
-          as.data.frame() %>%
-          mutate(state = x,
-                 draw = row_number()) %>%
-          gather(date,p_clinton,(1:(ncol(.)-2))) %>%
-          mutate(date = as.numeric(gsub('V','',date)),
-                 date = min(df$t) + date) %>%
-          return()
-        
-      })  %>%
-  do.call('bind_rows',.)
+p_clinton$state = colnames(state_correlation)[p_clinton$state]
 
-# get mean and CI
-predictions <- draws %>%
-  group_by(state,date) %>%
-  summarise(p_clinton_mean = mean(p_clinton),
-         p_clinton_high = quantile(p_clinton,0.975),
-         p_clinton_low = quantile(p_clinton,0.025)) %>%
+p_clinton <- p_clinton %>%
+  group_by(state) %>%
+  mutate(t = row_number() + min(df$begin)) %>%
   ungroup()
 
-# state indices (not sure I'm getting this right?)
-#predictions$state = names(mu_b_prior)[predictions$state]
-state_lookup <- tibble(state = unique(df$state),
-                       index_s = unique(df$index_s))
+ex_states <- c('IA','FL','OH','WI','MI','PA')
 
-predictions$state <- state_lookup[match(predictions$state,state_lookup$index_s),]$state
+# together
+# national vote = vote * state weights
+p_clinton <- p_clinton %>%
+  bind_rows(p_clinton %>% 
+    left_join(enframe(state_weights,'state','weight')) %>%
+    group_by(t) %>%
+    summarise(mean = weighted.mean(mean,weight),
+              high = weighted.mean(high,weight),
+              low = weighted.mean(low,weight)) %>%
+    mutate(state='--')
+  )
 
-# plot just means in each state
-predictions %>%
-  ggplot(.,aes(x=date,col=state,group=state)) +
-  geom_hline(yintercept = 0.5) +
-  geom_line(aes(y=p_clinton_mean)) +
-  scale_x_date(date_breaks = '1 month',date_labels = '%b',limits = c(ymd('2016-03-01'),ymd('2016-11-08'))) +
-  theme_minimal() + 
-  theme(panel.grid.minor = element_blank())
+# plot national and state together
+gridExtra::grid.arrange(
+  p_clinton %>%
+    filter(state == '--') %>%
+    left_join(df %>% select(state,t,p_clinton)) %>% # plot over time
+    # plot
+    ggplot(.,aes(x=t)) +
+    
+    geom_ribbon(aes(ymin=low,ymax=high),col=NA,alpha=0.2) +
+    geom_hline(yintercept = 0.5) +
+    geom_point(aes(y=p_clinton),alpha=0.5) +
+    geom_smooth(aes(y=p_clinton),method='loess',span=0.2,col='black',linetype=2,se=F) +
+    geom_line(aes(y=mean)) +
+    
+    facet_wrap(~state) +
+    theme_minimal()  +
+    theme(legend.position = 'none') +
+    scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b'),
+  
+  p_clinton %>%
+    filter(state %in% ex_states) %>%
+    left_join(df %>% select(state,t,p_clinton)) %>% # plot over time
+    # plot
+    ggplot(.,aes(x=t,col=state)) +
+    
+    geom_ribbon(aes(ymin=low,ymax=high),col=NA,alpha=0.2) +
+    geom_hline(yintercept = 0.5) +
+    geom_point(aes(y=p_clinton),alpha=0.5) +
+    geom_smooth(aes(y=p_clinton,col=state),method='loess',linetype=2,se=F) +
+    geom_line(aes(y=mean)) +
+    
+    facet_wrap(~state) +
+    theme_minimal()  +
+    theme(legend.position = 'none') +
+    scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b'),
+  
+  ncol=2
+)
 
-# plot means and CIs in swing states
-predictions %>%
-  filter(state %in% c('MI','PA','WI','FL','NC','OH')) %>%
-  ggplot(.,aes(x=date,col=state,group=state)) +
-  geom_hline(yintercept = 0.5) +
-  geom_line(aes(y=p_clinton_mean)) +
-  geom_ribbon(aes(ymin=p_clinton_low,ymax=p_clinton_high,fill=state),col=NA,alpha=0.2) +
-  scale_x_date(date_breaks = '1 month',date_labels = '%b',limits = c(ymd('2016-05-01'),ymd('2016-11-08'))) +
-  theme_minimal() + 
-  theme(panel.grid.minor = element_blank()) +
-  facet_wrap(~state)
