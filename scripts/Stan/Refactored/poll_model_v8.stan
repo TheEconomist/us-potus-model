@@ -114,7 +114,7 @@ transformed parameters {
   sigma_measure_noise_state = raw_sigma_measure_noise_state * prior_sigma_measure_noise;
   
   // averages
-  for (t in 1:current_T) sum_average_states[t] = rv_state_weights * (mu_b[:, t] + polling_error);
+  for (t in 1:current_T) sum_average_states[t] = rv_state_weights * inv_logit(mu_b[:, t] + polling_error);
 
   //*** fill pi_democrat
   for (i in 1:N){
@@ -124,7 +124,7 @@ transformed parameters {
       // alpha              = discrepancy adjustment
       // mu_c               = polling house effect
       // measure_noise      = noise of the individual poll
-      pi_democrat[i] = mu_a[day[i]] + sum_average_states[day[i]] + alpha + mu_c[poll[i]] + sigma_measure_noise_national * measure_noise[i];
+      pi_democrat[i] = mu_a[day[i]] + logit(sum_average_states[day[i]]) + alpha + mu_c[poll[i]] + sigma_measure_noise_national * measure_noise[i];
     } else {
       // state-level
       // mu_a               = national component
