@@ -31,22 +31,6 @@ RUN_DATE <- min(ymd('2016-11-08'),Sys.Date())
 election_day <- ymd("2016-11-08")
 start_date <- as.Date("2016-03-01") # Keeping all polls after March 1, 2016
 
-# Useful functions ---------
-corr_matrix <- function(m){
-  (diag(m)^-.5 * diag(nrow = nrow(m))) %*% m %*% (diag(m)^-.5 * diag(nrow = nrow(m))) 
-}
-
-cov_matrix <- function(n, sigma2, rho){
-  m <- matrix(nrow = n, ncol = n)
-  m[upper.tri(m)] <- rho
-  m[lower.tri(m)] <- rho
-  diag(m) <- 1
-  (sigma2^.5 * diag(n))  %*% m %*% (sigma2^.5 * diag(n))
-}
-
-logit <- function(x) log(x/(1-x))
-inv_logit <- function(x) 1/(1 + exp(-x))
-
 
 # wrangle polls -----------------------------------------------------------
 # read
@@ -111,6 +95,9 @@ df <- df %>%
 
 
 
+
+# prepare stan date -----------------------------------------------------------
+
 # create correlation matrix ---------------------------------------------
 
 #here("data")
@@ -118,14 +105,19 @@ polls_2012 <- read.csv("data/potus_results_76_16.csv")
 polls_2012 <- polls_2012 %>% 
   select(year, state, dem) %>%
   spread(state, dem) %>% select(-year)
-
 state_correlation <- cor(polls_2012)  
-state_correlation <- lqmm::make.positive.definite(state_correlation)  
 
-# overrirde empirical with cov matrix from Kremp
-state_correlation <- cov_matrix(ncol(polls_2012), 0.1^2, .8) # bump the error to 2.75% and correlation to 0.8
-colnames(state_correlation) <- colnames(polls_2012)
-rownames(state_correlation) <- colnames(polls_2012)
+state_correlation_error <- state_correlation # covariance for backward walk
+diag(state_correlation_error) <- rep(0.0064, 51)
+state_correlation_error <- lqmm::make.positive.definite(state_correlation_error)  
+
+state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
+diag(state_correlation_mu_b_T) <- rep(0.05, 51)
+state_correlation_mu_b_T <- lqmm::make.positive.definite(state_correlation_mu_b_T)  
+
+state_correlation_mu_b_walk <- state_correlation
+diag(state_correlation_mu_b_walk) <- rep(0.001575, 51) # covariance for forward walk
+state_correlation_mu_b_walk <- lqmm::make.positive.definite(state_correlation_mu_b_walk)  
 
 # Numerical indices passed to Stan for states, days, weeks, pollsters
 df <- df %>% 
@@ -265,14 +257,13 @@ n_respondents <- df$n_respondents
 current_T <- max(df$poll_day)
 ss_correlation <- state_correlation
 
-prior_sigma_measure_noise <- 0.02
-prior_sigma_a <- 0.02 # 0.003571428
-prior_sigma_b <- 0.02 # 0.003571428
+prior_sigma_measure_noise <- 0.01 ### 0.1 / 2
+prior_sigma_a <- 0.025 ### 0.05 / 2
+prior_sigma_b <- 0.025 ### 0.05 / 2
 mu_b_prior <- mu_b_prior
-prior_sigma_c <- 0.01
+prior_sigma_c <- 0.05 ### 0.1 / 2
 mu_alpha <- alpha_prior
-sigma_alpha <- 0.02
-prior_sigma_mu_c <- 0.01
+sigma_alpha <- 0.2  ### 0.2
 
 
 data <- list(
@@ -288,6 +279,9 @@ data <- list(
   n_respondents = n_respondents,
   current_T = as.integer(current_T),
   ss_correlation = state_correlation,
+  ss_corr_mu_b_T = state_correlation_mu_b_T,
+  ss_corr_mu_b_walk = state_correlation_mu_b_walk,
+  ss_corr_error = state_correlation_error,
   prior_sigma_measure_noise = prior_sigma_measure_noise,
   prior_sigma_a = prior_sigma_a,
   prior_sigma_b = prior_sigma_b,
@@ -309,11 +303,11 @@ initf2 <- function(chain_id = 1) {
        raw_mu_c = abs(rnorm(P)),
        measure_noise = abs(rnorm(N)),
        raw_polling_error = abs(rnorm(S)),
-       sigma_measure_noise_national = abs(rnorm(1, 0, prior_sigma_measure_noise / 2)),
-       sigma_measure_noise_state = abs(rnorm(1, 0, prior_sigma_measure_noise / 2)),
-       sigma_mu_c = abs(rnorm(1, 0, prior_sigma_mu_c / 2)),
-       sigma_mu_a = abs(rnorm(1, 0, prior_sigma_a / 2)),
-       sigma_mu_b = abs(rnorm(1, 0, prior_sigma_b /2))
+       sigma_measure_noise_national = abs(rnorm(1, 0, prior_sigma_measure_noise)),
+       sigma_measure_noise_state = abs(rnorm(1, 0, prior_sigma_measure_noise)),
+       sigma_mu_c = abs(rnorm(1, 0, prior_sigma_c)),
+       sigma_mu_a = abs(rnorm(1, 0, prior_sigma_a)),
+       sigma_mu_b = abs(rnorm(1, 0, prior_sigma_b))
   )
 }
 
@@ -324,15 +318,85 @@ init_ll <- lapply(1:n_chains, function(id) initf2(chain_id = id))
 #setwd(here("scripts/Stan/Refactored/"))
 
 # read model code
-model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v6.stan")
+model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v7.stan")
 
 # run model
 out <- rstan::sampling(model, data = data,
-                       refresh=10,
-                       chains = 2, iter = 1000,warmup=500, init = init_ll
+                       refresh=50,
+                       chains = 2, iter = 1000, warmup=500, init = init_ll
 )
 
 
 # save model for today
-write_rds(out, sprintf('models/stan_model_%s.rds',RUN_DATE),compress = 'gz')
+write_rds(out, sprintf('stan_model_%s.rds',RUN_DATE),compress = 'gz')
 
+### Extract results ----
+# national vote
+mu_a <- rstan::extract(out, pars = "mu_a")[[1]]
+
+# state deviations
+mu_b <- rstan::extract(out, pars = "mu_b")[[1]]
+
+# extend mu_a to full length of mu_b
+mu_a <- cbind(mu_a,
+      matrix(mu_a[,ncol(mu_a)], nrow = nrow(mu_a), ncol = (ncol(mu_b)-ncol(mu_a))))
+mu_a <- cbind(mu_a,
+      matrix(0, nrow = nrow(mu_a), ncol = (dim(mu_b)[3] - ncol(mu_a))))
+
+# prediction in any state is mu_b + mu_a
+draws <- lapply(1:dim(mu_b)[2],
+      function(x){
+        # get state mu_b
+        state_mu_b_draws <- mu_b[ , x, ]
+        
+        # add national mu_a and convert to inv.logit
+        mu_b_plus_a <- inv.logit(state_mu_b_draws + mu_a)
+        
+        # inv logit
+        mu_b_plus_a %>%
+          as.data.frame() %>%
+          mutate(state = x,
+                 draw = row_number()) %>%
+          gather(date,p_clinton,(1:(ncol(.)-2))) %>%
+          mutate(date = as.numeric(gsub('V','',date)),
+                 date = min(df$t) + date) %>%
+          return()
+        
+      })  %>%
+  do.call('bind_rows',.)
+
+# get mean and CI
+predictions <- draws %>%
+  group_by(state,date) %>%
+  summarise(p_clinton_mean = mean(p_clinton),
+         p_clinton_high = quantile(p_clinton,0.975),
+         p_clinton_low = quantile(p_clinton,0.025)) %>%
+  ungroup()
+
+# state indices (not sure I'm getting this right?)
+#predictions$state = names(mu_b_prior)[predictions$state]
+state_lookup <- tibble(state = unique(df$state),
+                       index_s = unique(df$index_s))
+
+predictions$state <- state_lookup[match(predictions$state,state_lookup$index_s),]$state
+
+# plot just means in each state
+predictions %>%
+  ggplot(.,aes(x=date,col=state,group=state)) +
+  geom_hline(yintercept = 0.5) +
+  geom_line(aes(y=p_clinton_mean)) +
+  scale_x_date(date_breaks = '1 month',date_labels = '%b',limits = c(ymd('2016-03-01'),ymd('2016-11-08'))) +
+  theme_minimal() + 
+  theme(panel.grid.minor = element_blank())
+
+# plot means and CIs in swing states
+predictions %>%
+  filter(state %in% c('MI','PA','WI','FL','NC','OH')) %>%
+  ggplot(.,aes(x=date,col=state,group=state)) +
+  geom_hline(yintercept = 0.5) +
+  geom_line(aes(y=p_clinton_mean)) +
+  geom_ribbon(aes(ymin=p_clinton_low,ymax=p_clinton_high,fill=state),col=NA,alpha=0.2) +
+  scale_x_date(date_breaks = '1 month',date_labels = '%b',limits = c(ymd('2016-05-01'),ymd('2016-11-08'))) +
+  theme_minimal() + 
+  theme(panel.grid.minor = element_blank()) +
+  facet_wrap(~state)

@@ -42,9 +42,9 @@
 # }
 #
 
-# RUN_DATE <- "2016-11-08"
-# 
-# out <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
+RUN_DATE <- "2016-11-08"
+
+out <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
 
 ### Extract ----
 # movement in the random walk
@@ -64,11 +64,11 @@ alpha <- rstan::extract(out, pars = "alpha")[[1]]
 hist(alpha)
 
 # national average
-sum_average_states <- rstan::extract(out, pars = "sum_average_states")[[1]] 
+mu_a <- rstan::extract(out, pars = "mu_a")[[1]] 
 
-tibble(low = apply(sum_average_states,2,function(x){inv.logit(quantile(x,0.025))}),
-       high = apply(sum_average_states,2,function(x){inv.logit(quantile(x,0.975))}),
-       mean = apply(sum_average_states,2,function(x){inv.logit(mean(x))})) %>%
+tibble(low = apply(mu_a,2,function(x){inv.logit(quantile(x,0.025))}),
+       high = apply(mu_a,2,function(x){inv.logit(quantile(x,0.975))}),
+       mean = apply(mu_a,2,function(x){inv.logit(mean(x))})) %>%
   mutate(t = row_number() + min(df$begin)) %>%
   ggplot(.,aes(x=t)) +
   geom_line(aes(y=mean)) +
@@ -82,9 +82,6 @@ tibble(low = apply(sum_average_states,2,function(x){inv.logit(quantile(x,0.025))
               aes(x=t,y=p_clinton),linetype=2)
 
 # state averages
-mu_a <- rstan::extract(out, pars = "mu_a")[[1]] 
-mu_a_mean <- colMeans(inv.logit(mu_a))
-
 mu_b <- rstan::extract(out, pars = "mu_b")[[1]] 
 mu_b_means <- pblapply(1:dim(mu_b)[2],
                        function(x){
@@ -110,8 +107,25 @@ mu_b_means <- mu_b_means %>%
   mutate(t = row_number() + min(df$begin)) %>%
   ungroup()
 
-ex_states <- c('FL','NC','WI','MI','PA','OH','IA','AZ','NH')
+ex_states <- c('FL','NC','WI','MI','PA','OH')
 
+# together
+gridExtra::grid.arrange(
+  tibble(low = apply(mu_a,2,function(x){inv.logit(quantile(x,0.025))}),
+         high = apply(mu_a,2,function(x){inv.logit(quantile(x,0.975))}),
+         mean = apply(mu_a,2,function(x){inv.logit(mean(x))})) %>%
+    mutate(t = row_number() + min(df$begin)) %>%
+    ggplot(.,aes(x=t)) +
+    geom_line(aes(y=mean)) +
+    geom_ribbon(aes(ymin=low,ymax=high),alpha=0.2) +
+    theme_minimal() +
+    geom_point(data=df[df$state=='--',],
+               aes(x=t,y=p_clinton),
+               alpha=0.5) +
+    stat_smooth(data=df[df$state=='--',],
+                geom='line',method='loess',span=0.1,
+                aes(x=t,y=p_clinton),linetype=2) +
+    scale_x_date(limits=c(ymd('2016-09-01','2016-11-08'))),
 mu_b_means %>%
   filter(state %in% ex_states) %>%
   left_join(df %>% select(state,t,p_clinton)) %>% # plot over time
@@ -122,7 +136,10 @@ mu_b_means %>%
   geom_ribbon(aes(ymin=low,ymax=high,fill=state),col=NA,alpha=0.2) +
   facet_wrap(~state) +
   theme_minimal()  +
-  theme(legend.position = 'none')
+  theme(legend.position = 'none') +
+  scale_x_date(limits=c(ymd('2016-09-01','2016-11-08'))),
+ncol=2
+)
 
 mu_b_means %>%
   filter(state %in% ex_states,
