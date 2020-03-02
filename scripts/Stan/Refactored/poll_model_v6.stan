@@ -156,4 +156,3 @@ model {
   //*** likelihood
   n_democrat ~ binomial_logit(n_respondents, pi_democrat);
 }
-

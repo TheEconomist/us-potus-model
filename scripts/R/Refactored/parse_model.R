@@ -92,8 +92,8 @@ mu_b_means <- pblapply(1:dim(mu_b)[2],
                          mu_ab <- inv.logit(lapply(1:dim(mu_b)[3],
                                                    function(y){mu_b[,,y][,x]
                                                      }) %>% do.call('cbind',.)
-                                            + 
-                                              cbind(mu_a, matrix(0, nrow = nrow(mu_a), ncol = dim(mu_b)[3] - ncol(mu_a) )))
+                                           +
+                                            cbind(mu_a, matrix(0, nrow = nrow(mu_a), ncol = dim(mu_b)[3] - ncol(mu_a) )))
                          
                          # put in tibble
                          tibble(low = apply(mu_ab,2,function(x){(quantile(x,0.05))}),
@@ -110,8 +110,10 @@ mu_b_means <- mu_b_means %>%
   mutate(t = row_number() + min(df$begin)) %>%
   ungroup()
 
+ex_states <- c('FL','NC','WI','MI','PA','OH','IA','AZ','NH')
+
 mu_b_means %>%
-  filter(state %in% c('FL','NC','WI','MI','PA','OH')) %>%
+  filter(state %in% ex_states) %>%
   left_join(df %>% select(state,t,p_clinton)) %>% # plot over time
   ggplot(.,aes(x=t,col=state)) +
   geom_hline(yintercept = 0.5) +
@@ -123,7 +125,7 @@ mu_b_means %>%
   theme(legend.position = 'none')
 
 mu_b_means %>%
-  filter(state %in% c('FL','NC','WI','MI','PA','OH'),
+  filter(state %in% ex_states,
          t >= ymd('2016-09-01')) %>%
   left_join(df %>% select(state,t,p_clinton)) %>% # plot over time
   ggplot(.,aes(x=t,col=state)) +
@@ -144,7 +146,7 @@ mu_b_means %>%
   geom_abline() +
   geom_text() +
   geom_smooth(method='lm',linetype=2) +
-  coord_cartesian(xlim=c(0.45,0.55),ylim=c(0.45,0.55))
+  coord_cartesian(xlim=c(0.4,0.6),ylim=c(0.4,0.6))
 
 # polls
 pi_dem <-  rstan::extract(out, pars = "pi_democrat")[[1]] 

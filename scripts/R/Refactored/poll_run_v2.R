@@ -31,6 +31,22 @@ RUN_DATE <- min(ymd('2016-11-08'),Sys.Date())
 election_day <- ymd("2016-11-08")
 start_date <- as.Date("2016-03-01") # Keeping all polls after March 1, 2016
 
+# Useful functions ---------
+corr_matrix <- function(m){
+  (diag(m)^-.5 * diag(nrow = nrow(m))) %*% m %*% (diag(m)^-.5 * diag(nrow = nrow(m))) 
+}
+
+cov_matrix <- function(n, sigma2, rho){
+  m <- matrix(nrow = n, ncol = n)
+  m[upper.tri(m)] <- rho
+  m[lower.tri(m)] <- rho
+  diag(m) <- 1
+  (sigma2^.5 * diag(n))  %*% m %*% (sigma2^.5 * diag(n))
+}
+
+logit <- function(x) log(x/(1-x))
+inv_logit <- function(x) 1/(1 + exp(-x))
+
 
 # wrangle polls -----------------------------------------------------------
 # read
@@ -95,9 +111,6 @@ df <- df %>%
 
 
 
-
-# prepare stan date -----------------------------------------------------------
-
 # create correlation matrix ---------------------------------------------
 
 #here("data")
@@ -105,8 +118,14 @@ polls_2012 <- read.csv("data/potus_results_76_16.csv")
 polls_2012 <- polls_2012 %>% 
   select(year, state, dem) %>%
   spread(state, dem) %>% select(-year)
+
 state_correlation <- cor(polls_2012)  
 state_correlation <- lqmm::make.positive.definite(state_correlation)  
+
+# overrirde empirical with cov matrix from Kremp
+state_correlation <- cov_matrix(ncol(polls_2012), 0.1^2, .8) # bump the error to 2.75% and correlation to 0.8
+colnames(state_correlation) <- colnames(polls_2012)
+rownames(state_correlation) <- colnames(polls_2012)
 
 # Numerical indices passed to Stan for states, days, weeks, pollsters
 df <- df %>% 
@@ -246,7 +265,7 @@ n_respondents <- df$n_respondents
 current_T <- max(df$poll_day)
 ss_correlation <- state_correlation
 
-prior_sigma_measure_noise <- 0.05
+prior_sigma_measure_noise <- 0.02
 prior_sigma_a <- 0.01
 prior_sigma_b <- 0.01
 mu_b_prior <- mu_b_prior
