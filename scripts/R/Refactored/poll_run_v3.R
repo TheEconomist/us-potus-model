@@ -25,6 +25,15 @@ options(mc.cores = parallel::detectCores())
   #library(glmnetUtils, quietly = TRUE)
 }
 
+
+cov_matrix <- function(n, sigma2, rho){
+    m <- matrix(nrow = n, ncol = n)
+    m[upper.tri(m)] <- rho
+    m[lower.tri(m)] <- rho
+    diag(m) <- 1
+    (sigma2^.5 * diag(n))  %*% m %*% (sigma2^.5 * diag(n))
+}
+
 ## Master variables
 RUN_DATE <- min(ymd('2016-11-08'),Sys.Date())
 
@@ -107,17 +116,14 @@ polls_2012 <- polls_2012 %>%
   spread(state, dem) %>% select(-year)
 state_correlation <- cor(polls_2012)  
 
-state_correlation_error <- state_correlation # covariance for backward walk
-diag(state_correlation_error) <- rep(0.0064, 51)
-state_correlation_error <- lqmm::make.positive.definite(state_correlation_error)  
+#state_correlation_error <- state_correlation # covariance for backward walk
+state_correlation_error <- cov_matrix(51, 0.08^2, .8)
 
-state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
-diag(state_correlation_mu_b_T) <- rep(0.05, 51)
-state_correlation_mu_b_T <- lqmm::make.positive.definite(state_correlation_mu_b_T)  
+#state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
+state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 1/20, rho = 0.5)
 
-state_correlation_mu_b_walk <- state_correlation
-diag(state_correlation_mu_b_walk) <- rep(0.001575, 51) # covariance for forward walk
-state_correlation_mu_b_walk <- lqmm::make.positive.definite(state_correlation_mu_b_walk)  
+# state_correlation_mu_b_walk <- state_correlation
+state_correlation_mu_b_walk <- cov_matrix(51, (0.015)^2, 0.75)
 
 # Numerical indices passed to Stan for states, days, weeks, pollsters
 df <- df %>% 
@@ -255,7 +261,6 @@ n_democrat <- df$n_clinton
 n_respondents <- df$n_respondents
 
 current_T <- max(df$poll_day)
-ss_correlation <- state_correlation
 
 prior_sigma_measure_noise <- 0.01 ### 0.1 / 2
 prior_sigma_a <- 0.025 ### 0.05 / 2
