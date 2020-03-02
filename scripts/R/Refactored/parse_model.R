@@ -61,6 +61,8 @@ tibble(national_sigma = x,state_sigma = y) %>%
 # alpha
 alpha <- rstan::extract(out, pars = "alpha")[[1]] 
 
+hist(alpha)
+
 # national average
 sum_average_states <- rstan::extract(out, pars = "sum_average_states")[[1]] 
 
@@ -84,11 +86,14 @@ mu_a <- rstan::extract(out, pars = "mu_a")[[1]]
 mu_a_mean <- colMeans(inv.logit(mu_a))
 
 mu_b <- rstan::extract(out, pars = "mu_b")[[1]] 
-mu_b_means <- pblapply(1:dim(mu_b)[3],
+mu_b_means <- pblapply(1:dim(mu_b)[2],
                        function(x){
                          # pred is mu_a + mu_b for the past, just mu_b for the future
-                         mu_ab <- inv.logit(mu_b[,,x])# + cbind(mu_a, matrix(0, nrow = nrow(mu_a), ncol = ncol(mu_b[,,1]) - ncol(mu_a) )))
-                         mu_ab <- mu_ab
+                         mu_ab <- inv.logit(lapply(1:dim(mu_b)[3],
+                                                   function(y){mu_b[,,y][,x]
+                                                     }) %>% do.call('cbind',.)
+                                            + 
+                                              cbind(mu_a, matrix(0, nrow = nrow(mu_a), ncol = dim(mu_b)[3] - ncol(mu_a) )))
                          
                          # put in tibble
                          tibble(low = apply(mu_ab,2,function(x){(quantile(x,0.05))}),
@@ -109,9 +114,23 @@ mu_b_means %>%
   filter(state %in% c('FL','NC','WI','MI','PA','OH')) %>%
   left_join(df %>% select(state,t,p_clinton)) %>% # plot over time
   ggplot(.,aes(x=t,col=state)) +
+  geom_hline(yintercept = 0.5) +
   geom_line(aes(y=mean)) +
   geom_point(aes(y=p_clinton)) +
-  geom_ribbon(aes(ymin=low,ymax=high),alpha=0.2) +
+  geom_ribbon(aes(ymin=low,ymax=high,fill=state),col=NA,alpha=0.2) +
+  facet_wrap(~state) +
+  theme_minimal()  +
+  theme(legend.position = 'none')
+
+mu_b_means %>%
+  filter(state %in% c('FL','NC','WI','MI','PA','OH'),
+         t >= ymd('2016-09-01')) %>%
+  left_join(df %>% select(state,t,p_clinton)) %>% # plot over time
+  ggplot(.,aes(x=t,col=state)) +
+  geom_hline(yintercept = 0.5) +
+  geom_line(aes(y=mean)) +
+  geom_point(aes(y=p_clinton)) +
+  geom_ribbon(aes(ymin=low,ymax=high,fill=state),col=NA,alpha=0.2) +
   facet_wrap(~state) +
   theme_minimal()  +
   theme(legend.position = 'none')
@@ -119,11 +138,13 @@ mu_b_means %>%
 
 mu_b_means %>%
   group_by(state) %>%
-  summarise(mean=mean(mean)) %>%
+  summarise(mean=last(mean)) %>%
   left_join(enframe(inv.logit(mu_b_prior),'state','prior')) %>%
   ggplot(.,aes(x=prior,y=mean,label=state)) + # plot mean state pred vs prior
   geom_abline() +
-  geom_text()
+  geom_text() +
+  geom_smooth(method='lm',linetype=2) +
+  coord_cartesian(xlim=c(0.45,0.55),ylim=c(0.45,0.55))
 
 # polls
 pi_dem <-  rstan::extract(out, pars = "pi_democrat")[[1]] 
