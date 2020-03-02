@@ -114,7 +114,7 @@ transformed parameters {
   sigma_measure_noise_state = raw_sigma_measure_noise_state * prior_sigma_measure_noise;
   
   // averages
-  for (t in 1:current_T) sum_average_states[t] = rv_state_weights * inv_logit(mu_a[:, t] + mu_b[:, t] + polling_error);
+  for (t in 1:current_T) sum_average_states[t] = rv_state_weights * inv_logit(mu_a[t] + mu_b[:, t] + polling_error);
 
   //*** fill pi_democrat
   for (i in 1:N){
