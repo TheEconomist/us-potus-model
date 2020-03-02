@@ -323,7 +323,7 @@ init_ll <- lapply(1:n_chains, function(id) initf2(chain_id = id))
 #setwd(here("scripts/Stan/Refactored/"))
 
 # read model code
-model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v7.stan")
+model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v8.stan")
 
 # run model
 out <- rstan::sampling(model, data = data,
