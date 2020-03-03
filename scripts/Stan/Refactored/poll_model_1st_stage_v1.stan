@@ -11,19 +11,19 @@ data {
 parameters {
   vector[S + 1] delta_raw;
   real delta_mu;
-  real delta_sigma;
+  real<lower = 0> delta_sigma;
 }
 transformed parameters {
   vector[S + 1] delta;
   delta = delta_mu + delta_raw * delta_sigma;
 }
 model {
-  vector[N] pi_delta;
-  for (n in 1:N) pi_delta[n] = delta[s[n]];
   delta_raw ~ std_normal();
-  n_two_parties ~ binomial_logit_lpmf(n_respondents, pi_delta);
+  delta_mu ~ normal(0, 1);
+  delta_sigma ~ normal(0, 0.2);
+  for (n in 1:N) n_two_parties[n] ~ binomial_logit_lpmf(n_respondents[n], delta[s[n]]);
 }
 generated quantities {
   int yrep[N];
-  for (n in 1:N) yrep[n] = binomial_rng(n_respondents[n], logit(delta[n]));
+  for (n in 1:N) yrep[n] = binomial_rng(n_respondents[n], inv_logit(delta[s[n]]));
 }

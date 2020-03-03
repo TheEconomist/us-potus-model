@@ -7,19 +7,16 @@ data{
   int<lower = 1, upper = T> day[N];   // Day index
   int<lower = 1, upper = P> poll[N];  // Pollster index
   vector[S] state_weights; // subtract 1 for national; based on 2012/16 turnouts
-  
   // data
   int n_democrat[N];
   int n_respondents[N];
-  int pred_two_share[N];
-  
+  real pred_two_share[N];
   // forward-backward
   int<lower = 1, upper = T> current_T;
   matrix[S, S] ss_corr_mu_b_walk;
   matrix[S, S] ss_corr_mu_b_T;
   matrix[S, S] ss_corr_error;
-  
-  // prior input
+  //*** prior input
   // mu_a
   real<lower = 0> prior_sigma_a;
   // mu_b
@@ -32,9 +29,9 @@ data{
   real sigma_alpha; 
   // measurement noise
   real<lower = 0> prior_sigma_measure_noise;
-  
+  // delta
+  real prior_delta_sigma;
 }
-
 transformed data {
   row_vector[S] rv_state_weights;
   matrix[S, S] cholesky_ss_corr_mu_b_T;
@@ -45,7 +42,6 @@ transformed data {
   cholesky_ss_corr_error = cholesky_decompose(ss_corr_error);
   rv_state_weights = to_row_vector(state_weights);
 }
-
 parameters {
   // alpha
   real raw_alpha;             
@@ -65,6 +61,8 @@ parameters {
   vector[N] measure_noise;
   // e polling error
   vector[S] raw_polling_error;  // S state-specific polling errors (raw)
+  // delta
+  real raw_delta;
 }
 
 transformed parameters {
@@ -85,11 +83,11 @@ transformed parameters {
   real sigma_measure_noise_state;
   // e 
   vector[S] polling_error;  
-  
+  // delta
+  real delta;
   //*** containers
   vector[current_T] sum_average_states; 
   real pi_democrat[N];
-  
   //*** construct parameters
   // alpha
   alpha = mu_alpha + raw_alpha * sigma_alpha;
@@ -113,10 +111,10 @@ transformed parameters {
   // u
   sigma_measure_noise_national = raw_sigma_measure_noise_national * prior_sigma_measure_noise;
   sigma_measure_noise_state = raw_sigma_measure_noise_state * prior_sigma_measure_noise;
-  
+  // delta
+  delta = raw_delta * prior_delta_sigma;
   // averages
   for (t in 1:current_T) sum_average_states[t] = rv_state_weights * inv_logit(mu_b[:, t] + polling_error);
-
   //*** fill pi_democrat
   for (i in 1:N){
     // national-level
@@ -125,7 +123,8 @@ transformed parameters {
       // alpha              = discrepancy adjustment
       // mu_c               = polling house effect
       // measure_noise      = noise of the individual poll
-      pi_democrat[i] = mu_a[day[i]] + logit(sum_average_states[day[i]]) + alpha + mu_c[poll[i]] + sigma_measure_noise_national * measure_noise[i];
+      pi_democrat[i] = mu_a[day[i]] + logit(sum_average_states[day[i]]) + alpha + mu_c[poll[i]] + 
+        sigma_measure_noise_national * measure_noise[i] + delta * pred_two_share[i];
     } else {
       // state-level
       // mu_a               = national component
@@ -133,7 +132,8 @@ transformed parameters {
       // mu_c               = poll component
       // measure_noise (u)  = state noise
       // polling_error (e)  = polling error term (state specific)
-      pi_democrat[i] = mu_a[day[i]] + mu_b[state[i], day[i]] + mu_c[poll[i]] + measure_noise[i] * sigma_measure_noise_state + polling_error[state[i]];
+      pi_democrat[i] = mu_a[day[i]] + mu_b[state[i], day[i]] + mu_c[poll[i]] + 
+        measure_noise[i] * sigma_measure_noise_state + polling_error[state[i]] + delta * pred_two_share[i];
     }
   }
 }
@@ -148,9 +148,7 @@ model {
   // mu_b
   raw_mu_b_T ~ std_normal();
   raw_sigma_b ~ std_normal();
-  for (s in 1:S){
-    raw_mu_b[s] ~ std_normal();  
-  } 
+  for (s in 1:S) raw_mu_b[s] ~ std_normal();
   // mu_c
   raw_sigma_c ~ std_normal();
   raw_mu_c ~ std_normal();
@@ -160,6 +158,8 @@ model {
   measure_noise ~ std_normal();
   // raw_polling_error
   raw_polling_error ~ std_normal();
+  // raw_delta
+  raw_delta ~ std_normal();
   //*** likelihood
   n_democrat ~ binomial_logit(n_respondents, pi_democrat);
 }
