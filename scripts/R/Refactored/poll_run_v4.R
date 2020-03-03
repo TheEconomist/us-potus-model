@@ -22,7 +22,9 @@ options(mc.cores = parallel::detectCores())
   library(boot, quietly = TRUE)
   library(lqmm, quietly = TRUE)
   library(caret, quietly = TRUE)
-  #library(glmnetUtils, quietly = TRUE)
+  library(gridExtra, quietly = TRUE)
+  library(ggrepel, quietly = TRUE)
+  #library(glmnet, quietly = TRUE)
 }
 
 
@@ -117,13 +119,13 @@ polls_2012 <- polls_2012 %>%
 state_correlation <- cor(polls_2012)  
 
 #state_correlation_error <- state_correlation # covariance for backward walk
-state_correlation_error <- cov_matrix(51, 0.08^2, .8)
+state_correlation_error <- cov_matrix(51, 0.1^2, .8) # 0.08^2
 
 #state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
-state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 1/20, rho = 0.5)
+state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 1/20, rho = 0.5) #1/20
 
 # state_correlation_mu_b_walk <- state_correlation
-state_correlation_mu_b_walk <- cov_matrix(51, (0.015)^2, 0.75)
+state_correlation_mu_b_walk <- cov_matrix(51, (0.015)^2, 0.75) #(0.015)^2
 
 # Numerical indices passed to Stan for states, days, weeks, pollsters
 df <- df %>% 
@@ -264,9 +266,9 @@ current_T <- max(df$poll_day)
 
 prior_sigma_measure_noise <- 0.01 ### 0.1 / 2
 prior_sigma_a <- 0.025 ### 0.05 / 2
-prior_sigma_b <- 0.025 ### 0.05 / 2
+prior_sigma_b <- 0.03 ### 0.05 / 2
 mu_b_prior <- mu_b_prior
-prior_sigma_c <- 0.05 ### 0.1 / 2
+prior_sigma_c <- 0.02 ### 0.1 / 2
 mu_alpha <- alpha_prior
 sigma_alpha <- 0.2  ### 0.2
 
@@ -339,6 +341,8 @@ write_rds(out, sprintf('stan_model_%s.rds',RUN_DATE),compress = 'gz')
 # etc
 a <- rstan::extract(out, pars = "alpha")[[1]]
 
+hist(a)
+
 # extract predictions
 predicted_score <- rstan::extract(out, pars = "predicted_score")[[1]]
 
@@ -351,6 +355,7 @@ p_clinton <- pblapply(1:dim(predicted_score)[3],
                          tibble(low = apply(p_clinton,2,function(x){(quantile(x,0.05))}),
                                 high = apply(p_clinton,2,function(x){(quantile(x,0.95))}),
                                 mean = apply(p_clinton,2,function(x){(mean(x))}),
+                                prob = apply(p_clinton,2,function(x){(mean(x>0.5))}),
                                 state = x) 
                          
                        }) %>% do.call('bind_rows',.)
@@ -362,12 +367,13 @@ p_clinton <- p_clinton %>%
   mutate(t = row_number() + min(df$begin)) %>%
   ungroup()
 
-ex_states <- c('IA','FL','OH','WI','MI','PA')
+ex_states <- c('IA','FL','OH','WI','MI','PA','AZ','NC','NH')
 
 # together
 # national vote = vote * state weights
 p_clinton <- p_clinton %>%
-  bind_rows(p_clinton %>% 
+  bind_rows(
+    p_clinton %>% 
     left_join(enframe(state_weights,'state','weight')) %>%
     group_by(t) %>%
     summarise(mean = weighted.mean(mean,weight),
@@ -376,42 +382,117 @@ p_clinton <- p_clinton %>%
     mutate(state='--')
   )
 
-# plot national and state together
-gridExtra::grid.arrange(
-  p_clinton %>%
-    filter(state == '--') %>%
-    left_join(df %>% select(state,t,p_clinton)) %>% # plot over time
-    # plot
-    ggplot(.,aes(x=t)) +
-    
-    geom_ribbon(aes(ymin=low,ymax=high),col=NA,alpha=0.2) +
-    geom_hline(yintercept = 0.5) +
-    geom_point(aes(y=p_clinton),alpha=0.5) +
-    geom_smooth(aes(y=p_clinton),method='loess',span=0.2,col='black',linetype=2,se=F) +
-    geom_line(aes(y=mean)) +
-    
-    facet_wrap(~state) +
-    theme_minimal()  +
-    theme(legend.position = 'none') +
-    scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b'),
+# look
+p_clinton %>% filter(t == max(t),state %in% ex_states) %>% mutate(se = (high - mean)/2)
+
+
+# electoral college by simulation
+draws <- pblapply(1:dim(predicted_score)[3],
+             function(x){
+               # pred is mu_a + mu_b for the past, just mu_b for the future
+               p_clinton <- predicted_score[,,x]
+               
+               p_clinton <- p_clinton %>%
+                 as.data.frame() %>%
+                 mutate(draw = row_number()) %>%
+                 gather(t,p_clinton,1:(ncol(.)-1)) %>%
+                 mutate(t = as.numeric(gsub('V','',t)) + min(df$begin),
+                        state = colnames(state_correlation)[x]) 
+
+           
+         }) %>% do.call('bind_rows',.)
+
+
+sim_evs <- draws %>%
+  left_join(states2012 %>% select(state,ev),by='state') %>%
+  group_by(t,draw) %>%
+  summarise(dem_ev = sum(ev * (p_clinton > 0.5))) %>%
+  group_by(t) %>%
+  summarise(mean_dem_ev = mean(dem_ev),
+            high_dem_ev = quantile(dem_ev,0.975),
+            low_dem_ev = quantile(dem_ev,0.025),
+            prob = mean(dem_ev >= 270))
+
+# plot votes and forecast together
+natl_polls.gg <- p_clinton %>%
+  filter(state == '--') %>%
+  left_join(df %>% select(state,t,p_clinton)) %>% # plot over time
+  # plot
+  ggplot(.,aes(x=t)) +
   
-  p_clinton %>%
-    filter(state %in% ex_states) %>%
-    left_join(df %>% select(state,t,p_clinton)) %>% # plot over time
-    # plot
-    ggplot(.,aes(x=t,col=state)) +
-    
-    geom_ribbon(aes(ymin=low,ymax=high),col=NA,alpha=0.2) +
-    geom_hline(yintercept = 0.5) +
-    geom_point(aes(y=p_clinton),alpha=0.5) +
-    geom_smooth(aes(y=p_clinton,col=state),method='loess',linetype=2,se=F) +
-    geom_line(aes(y=mean)) +
-    
-    facet_wrap(~state) +
-    theme_minimal()  +
-    theme(legend.position = 'none') +
-    scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b'),
+  geom_ribbon(aes(ymin=low,ymax=high),col=NA,alpha=0.2) +
+  geom_hline(yintercept = 0.5) +
+  geom_hline(yintercept = national_mu_prior,linetype=2) +
+  geom_point(aes(y=p_clinton),alpha=0.5) +
+  #geom_smooth(aes(y=p_clinton),method='loess',span=0.2,col='black',linetype=2,se=F) +
+  geom_line(aes(y=mean)) +
   
-  ncol=2
+  facet_wrap(~state) +
+  theme_minimal()  +
+  theme(legend.position = 'none') +
+  scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b') +
+  labs(subtitle='p_clinton national')
+
+natl_evs.gg <-  ggplot(sim_evs, aes(x=t)) +
+  geom_hline(yintercept = 270) +
+  geom_line(aes(y=mean_dem_ev)) +
+  geom_ribbon(aes(ymin=low_dem_ev,ymax=high_dem_ev),alpha=0.2) +
+  theme_minimal()  +
+  theme(legend.position = 'none') +
+  scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b') +
+  labs(subtitle='clinton evs')
+
+state_polls.gg <- p_clinton %>%
+  filter(state %in% ex_states) %>%
+  left_join(df %>% select(state,t,p_clinton)) %>% # plot over time
+  # plot
+  ggplot(.,aes(x=t,col=state)) +
+  
+  geom_ribbon(aes(ymin=low,ymax=high),col=NA,alpha=0.2) +
+  geom_hline(yintercept = 0.5) +
+  geom_point(aes(y=p_clinton),alpha=0.5) +
+  #geom_smooth(aes(y=p_clinton,col=state),method='loess',linetype=2,se=F) +
+  geom_line(aes(y=mean)) +
+  
+  facet_wrap(~state) +
+  theme_minimal()  +
+  theme(legend.position = 'none') +
+  scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b') +
+  labs(subtitle='p_clinton state')
+
+grid.arrange(natl_polls.gg, natl_evs.gg, state_polls.gg, 
+             layout_matrix = rbind(c(1,1,3,3,3),
+                                   c(2,2,3,3,3))
 )
 
+
+# probs v other forecasters
+ggplot(sim_evs, aes(x=t)) +
+  geom_hline(yintercept = 0.5) +
+  geom_line(aes(y=prob))  +
+  coord_cartesian(ylim=c(0,1)) +
+  geom_hline(data=tibble(forecaster = c('nyt',
+                                        'fivethirtyeight',
+                                        'huffpost',
+                                        'predictwise',
+                                        'pec',
+                                        'dailykos',
+                                        'morris16'),
+                         prob = c(0.85,0.71,0.98,0.89,0.99,0.92,0.84)),
+             aes(yintercept=prob,col=forecaster),linetype=2)
+
+
+# probabilities over time
+p_clinton %>%
+  # plot
+  ggplot(.,aes(x=t,y=prob,col=state)) +
+  geom_hline(yintercept=0.5) +
+  geom_line() +
+  geom_label_repel(data = p_clinton %>% 
+                     filter(t==max(t),
+                            prob > 0.1 & prob < 0.9),
+                   aes(label=state)) +
+  theme_minimal()  +
+  theme(legend.position = 'none') +
+  scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b') +
+  scale_y_continuous(breaks=seq(0,1,0.1))
