@@ -36,11 +36,15 @@ cov_matrix <- function(n, sigma2, rho){
     (sigma2^.5 * diag(n))  %*% m %*% (sigma2^.5 * diag(n))
 }
 
+#for(RUN_DATE in as.character(seq.Date(ymd('2016-04-01'),ymd('2016-11-01'),'1 week'))){
+
 ## Master variables
 RUN_DATE <- min(ymd('2016-11-08'),Sys.Date())
 
 election_day <- ymd("2016-11-08")
 start_date <- as.Date("2016-03-01") # Keeping all polls after March 1, 2016
+
+print(sprintf('RUNNING FOR %s',RUN_DATE))
 
 
 # wrangle polls -----------------------------------------------------------
@@ -225,8 +229,9 @@ national_mu_prior <- predict(prior_model,newdata = tibble(q2gdp = 1.1,
                                                           juneapp = 4,
                                                           year = 2016))
 
+national_mu_prior <- 50.6
 
-cat(sprintf('Prior Clinton two-party vote is %s\nWith a standard error of %s',
+cat(sprintf('Prior Clinton two-party vote is %s\nWith a standard error of %s\n',
             round(national_mu_prior/100,3),round(best_result$RMSE/100,3)))
 
 # on correct scale
@@ -340,8 +345,6 @@ write_rds(out, sprintf('stan_model_%s.rds',RUN_DATE),compress = 'gz')
 ### Extract results ----
 # etc
 a <- rstan::extract(out, pars = "alpha")[[1]]
-
-hist(a)
 
 # extract predictions
 predicted_score <- rstan::extract(out, pars = "predicted_score")[[1]]
@@ -466,33 +469,3 @@ grid.arrange(natl_polls.gg, natl_evs.gg, state_polls.gg,
 )
 
 
-# probs v other forecasters
-ggplot(sim_evs, aes(x=t)) +
-  geom_hline(yintercept = 0.5) +
-  geom_line(aes(y=prob))  +
-  coord_cartesian(ylim=c(0,1)) +
-  geom_hline(data=tibble(forecaster = c('nyt',
-                                        'fivethirtyeight',
-                                        'huffpost',
-                                        'predictwise',
-                                        'pec',
-                                        'dailykos',
-                                        'morris16'),
-                         prob = c(0.85,0.71,0.98,0.89,0.99,0.92,0.84)),
-             aes(yintercept=prob,col=forecaster),linetype=2)
-
-
-# probabilities over time
-p_clinton %>%
-  # plot
-  ggplot(.,aes(x=t,y=prob,col=state)) +
-  geom_hline(yintercept=0.5) +
-  geom_line() +
-  geom_label_repel(data = p_clinton %>% 
-                     filter(t==max(t),
-                            prob > 0.1 & prob < 0.9),
-                   aes(label=state)) +
-  theme_minimal()  +
-  theme(legend.position = 'none') +
-  scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b') +
-  scale_y_continuous(breaks=seq(0,1,0.1))
