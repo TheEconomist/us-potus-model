@@ -75,7 +75,7 @@ state_lookup <- tibble(state = colnames(state_correlation),
 predictions$state <- state_lookup[match(predictions$state,state_lookup$index_s),]$state
 
  
-
+df$np_clinton <- df$n_clinton / (df$n_clinton + df$n_trump)
 
 plt <- 
   ggplot(predictions,aes(x=date,col=state,group=state)) +
@@ -86,7 +86,7 @@ plt <-
   theme_minimal() + 
   theme(panel.grid.minor = element_blank(), legend.position = "none" ) +
   facet_wrap(~state) +
-  geom_point(data = df, aes(x = t, y = p_clinton), size = 0.5)
+  geom_point(data = df, aes(x = t, y = np_clinton), size = 0.5)
 
 
 
