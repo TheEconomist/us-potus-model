@@ -120,12 +120,15 @@ state_correlation <- cor(polls_2012)
 
 #state_correlation_error <- state_correlation # covariance for backward walk
 state_correlation_error <- cov_matrix(51, 0.1^2, .8) # 0.08^2
+state_correlation_error <- state_correlation_error * state_correlation
 
 #state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
 state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 1/20, rho = 0.5) #1/20
+state_correlation_mu_b_T <- state_correlation_mu_b_T * state_correlation
 
 # state_correlation_mu_b_walk <- state_correlation
 state_correlation_mu_b_walk <- cov_matrix(51, (0.015)^2, 0.75) #(0.015)^2
+state_correlation_mu_b_walk <- state_correlation_mu_b_walk * state_correlation
 
 # Numerical indices passed to Stan for states, days, weeks, pollsters
 df <- df %>% 
@@ -199,7 +202,7 @@ ev_state <- states2012$ev
 names(ev_state) <- states2012$state
 
 
-# Creating priors ---------
+##### Creating priors --------------
 # read in abramowitz data
 #setwd(here("data/"))
 abramowitz <- read.csv('data/abramowitz_data.csv') %>% filter(year != 2016)
@@ -212,27 +215,20 @@ prior_model <- caret::train(
   trControl = trainControl(
     method = "LOOCV"),
   tuneLength = 50)
-
-
 # find the optimal parameters
 best = which(rownames(prior_model$results) == rownames(prior_model$bestTune))
 best_result = prior_model$results[best, ]
 rownames(best_result) = NULL
 best_result
-
 # make predictions
 national_mu_prior <- predict(prior_model,newdata = tibble(q2gdp = 1.1,
                                                           juneapp = 4,
                                                           year = 2016))
-
-
 cat(sprintf('Prior Clinton two-party vote is %s\nWith a standard error of %s',
             round(national_mu_prior/100,3),round(best_result$RMSE/100,3)))
-
 # on correct scale
 national_mu_prior <- national_mu_prior / 100
 national_sigma_prior <- best_result$RMSE / 100
-
 # Mean of the mu_b_prior
 # 0.486 is the predicted Clinton share of the national vote according to the Lewis-Beck & Tien model
 # https://pollyvote.com/en/components/econometric-models/lewis-beck-tien/
@@ -365,9 +361,10 @@ write_rds(out, sprintf('stan_model_%s.rds',RUN_DATE),compress = 'gz')
 ### Extract results ----
 # etc
 a <- rstan::extract(out, pars = "alpha")[[1]]
-
 hist(a)
-
+# delta
+delta <- rstan::extract(out, pars = "delta")[[1]]
+hist(delta)
 # extract predictions
 predicted_score <- rstan::extract(out, pars = "predicted_score")[[1]]
 
