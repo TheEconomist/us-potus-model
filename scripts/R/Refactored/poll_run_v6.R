@@ -524,3 +524,19 @@ p_clinton %>%
   scale_y_continuous(breaks=seq(0,1,0.1)) +
   labs(subtitle = identifier)
 
+# final EV distribution
+draws %>%
+  left_join(states2012 %>% select(state,ev),by='state') %>%
+  filter(t==max(t)) %>%
+  group_by(draw) %>%
+  summarise(dem_ev = sum(ev* (p_clinton > 0.5))) %>%
+  ggplot(.,aes(x=dem_ev,
+               fill=ifelse(dem_ev>=270,'Democratic','Republican'))) +
+  geom_vline(xintercept = 270) +
+  geom_histogram(binwidth=1) +
+  theme_minimal() +
+  theme(legend.position = 'top',
+        panel.grid.minor = element_blank()) +
+  scale_fill_manual(name='Electoral College winner',values=c('Democratic'='blue','Republican'='red')) +
+  labs(x='Democratic electoral college votes')
+

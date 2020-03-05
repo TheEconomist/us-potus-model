@@ -3,74 +3,9 @@ library(tidyverse)
 library(purrr)
 library(urbnmapr)
 library(caret)
-library(colorspace)
 
-# fit national model ------------------------------------------------------
-abramowitz <- read.csv('data/abramowitz_data.csv') %>% filter(year != 2020)
+NATIONAL_PRIOR_DEM_TWO_PARTY_SHARE <- 0.507
 
-# train a caret model to predict demvote with incvote ~ q2gdp + juneapp + year:q2gdp + year:juneapp 
-prior_model <- caret::train(
-  incvote ~ q2gdp + juneapp + year:q2gdp + year:juneapp,
-  data = abramowitz,
-  method = "glmnet",
-  trControl = trainControl(
-    method = "LOOCV",
-    verboseIter = T),
-  tuneLength = 10)
-
-# find the optimal parameters
-best = which(rownames(prior_model$results) == rownames(prior_model$bestTune))
-best_result = prior_model$results[best, ]
-rownames(best_result) = NULL
-best_result
-
-coef(prior_model$finalModel,best_result$lambda)
-
-# make predictions
-NATIONAL_PRIOR_DEM_TWO_PARTY_SHARE <- predict(prior_model,newdata = tibble(q2gdp = 1,
-                                                          juneapp = -10,
-                                                          year = 2020)) / 100
-
-NATIONAL_MODEL_ERROR <- best_result$RMSE / 100
-
-cat(sprintf('Prior Clinton two-party vote is %s\nWith a standard error of %s',
-            round(NATIONAL_PRIOR_DEM_TWO_PARTY_SHARE,1),
-            round(NATIONAL_MODEL_ERROR,1)))
-
-
-
-# grid of predictions
-expand.grid(q2gdp = c(-2,-1,0,1,2),
-            juneapp = seq(-16,0),
-            year=2020) %>%
-  mutate(incumbent_share = predict(prior_model,.)) %>%
-  ggplot(.,aes(x=juneapp,y=incumbent_share,col=factor(q2gdp),fill=factor(q2gdp),group=factor(q2gdp))) +
-  geom_hline(yintercept = 50,linetype=2,col='gray70') +
-  geom_vline(xintercept = 0,linetype=2,col='gray70') +
-  # error
-  geom_ribbon(aes(ymin = incumbent_share - best_result$RMSE*2,
-                  ymax = incumbent_share + best_result$RMSE*2),
-              col=NA,alpha=0.1,show.legend = F) +
-  # prediction
-  geom_line() +
-  
-  # trump share needed for two-party win
-  geom_hline(yintercept = 48.6,linetype=2,col='black') +
-  annotate(geom='text',x=-16,y=48.7,label='Estimated Trump share needed for electoral college victory',
-            hjust=0,col='black') +
-  # labels and such
-  labs(x='Trump approval rating(in June)',
-       y='',
-       title='Predicted Trump vote share of the national popular vote, two-party %') +
-  scale_color_discrete_qualitative(name='Q2 GDP growth',palette = 'Warm') +
-  scale_x_continuous(breaks=seq(-20,20,2)) +
-  scale_y_continuous(breaks=seq(0,100,2)) +
-  theme_minimal() +
-  theme(legend.position = 'top',
-        legend.justification = 'left',
-        panel.grid.minor = element_blank())  
-
-# now, state. start by reading in the data --------------------------------
 # get results
 results <- politicaldata::pres_results 
 
@@ -102,13 +37,13 @@ models <- results %>%
   #filter(state %in% c('AZ','FL','WI')) %>%
   group_by(state) %>%
   do(mod = train(dem_two_party_share_lean ~ year,
-               data=.,
-               method='gamboost',
-               trControl = trainControl(method='LOOCV',allowParallel = TRUE, verboseIter=TRUE), 
-               # tuneGrid = expand.grid(degree=1,
-               #                        span=c(0.2,0.3,0.4,0.5,0.6,0.7)),
-               tuneLength = 10,
-               )
+                 data=.,
+                 method='gamboost',
+                 trControl = trainControl(method='LOOCV',allowParallel = TRUE, verboseIter=TRUE), 
+                 # tuneGrid = expand.grid(degree=1,
+                 #                        span=c(0.2,0.3,0.4,0.5,0.6,0.7)),
+                 tuneLength = 5,
+  )
   )
 
 
@@ -124,7 +59,7 @@ model_error <- tibble(state = models$state,
 # is this any better than just taking the lagged value
 model_error %>%
   left_join(results %>%
-             group_by(state) %>%
+              group_by(state) %>%
               mutate(error = dem_two_party_share_lean - lag(dem_two_party_share_lean)) %>%
               na.omit() %>%
               summarise(lagged_value_rmse = sqrt(mean(error^2)))
@@ -149,18 +84,18 @@ model_error %>%
 # predict for 2020 and EDA ------------------------------------------------
 # make predictions for 2020
 predictions <- lapply(1:nrow(models),
-      function(x){
-        model <- models$mod[[x]]
-        state <- models$state[x]
-        
-        dat <- tibble(year=seq(1976,2020)) %>%
-          mutate(state = state,
-                 dem_two_party_share_lean_hat = predict(object = model,
-                                                            newdata = .))
-        
-        return(dat)
-      
-        }) %>%
+                      function(x){
+                        model <- models$mod[[x]]
+                        state <- models$state[x]
+                        
+                        dat <- tibble(year=seq(1976,2020)) %>%
+                          mutate(state = state,
+                                 dem_two_party_share_lean_hat = predict(object = model,
+                                                                        newdata = .))
+                        
+                        return(dat)
+                        
+                      }) %>%
   do.call('bind_rows',.)
 
 
@@ -172,7 +107,7 @@ predictions <- predictions %>%
 predictions %>%
   filter(state %in% c('FL','NC','AZ','WI','PA','MI','NH','MN','AZ','TX','GA')) %>%
   ggplot(.,
-       aes(x=year,col=state,group=state)) +
+         aes(x=year,col=state,group=state)) +
   geom_hline(yintercept = 0) +
   geom_point(aes(y=dem_two_party_share_lean)) + 
   scale_y_continuous(breaks = seq(-1,1,0.05), labels=function(x){round(x*100)}) +
@@ -200,7 +135,7 @@ predictions_2020 <- predictions %>%
 # plot without leaners
 urbnmapr::states %>%
   left_join(predictions_2020 %>% dplyr::select(state_abbv = state,
-                                        dem_two_party_share_hat)) %>%
+                                               dem_two_party_share_hat)) %>%
   mutate(dem_margin = cut(-(dem_two_party_share_hat-0.5)*2,
                           breaks = c(-1,-0.2,-0.1,-0.05,
                                      #0,
@@ -212,7 +147,7 @@ urbnmapr::states %>%
                                      "+5 to +10",
                                      "+10 to +20",
                                      "Republican +20 or higher")
-                          )) %>%
+  )) %>%
   # plot
   ggplot(.,aes(x=long,y=lat,group=group)) +
   geom_polygon(aes(fill=dem_margin),col=NA) +
@@ -232,7 +167,7 @@ urbnmapr::states %>%
 # plot with leaners
 urbnmapr::states %>%
   left_join(predictions_2020 %>% dplyr::select(state_abbv = state,
-                                        dem_two_party_share_hat)) %>%
+                                               dem_two_party_share_hat)) %>%
   mutate(dem_margin = cut(-(dem_two_party_share_hat-0.5)*2,
                           breaks = c(-1,-0.2,-0.1,-0.05,
                                      0,
@@ -296,17 +231,17 @@ plot(predictions_2020$dem_two_party_share_hat, errors[runif(1,0,nrow(errors)),])
 
 # add thsoe errors times state-level sigma and error to the predicted mean to get trials
 trials <- lapply(1:ncol(errors),
-      function(x){
-        # national error is 0.026
-        national_model_error <- NATIONAL_MODEL_ERROR/100 # needs to be in two-party terms
-        # state model error plus extrapolation error
-        state_model_error <- model_error$error[x] + 0.02
-        
-        # prediction + (z score error * sigma)
-        predictions_2020$dem_two_party_share_hat[x] + 
-          (errors[,x] * 
-             (national_model_error + state_model_error)) # simulate 5 pct pt natl polling error
-      }) %>%
+                 function(x){
+                   # national error is 0.026
+                   national_model_error <- 0.026
+                   # state model error plus extrapolation error
+                   state_model_error <- model_error$error[x] + 0.02
+                   
+                   # prediction + (z score error * sigma)
+                   predictions_2020$dem_two_party_share_hat[x] + 
+                     (errors[,x] * 
+                        (national_model_error + state_model_error)) # simulate 5 pct pt natl polling error
+                 }) %>%
   do.call('cbind',.)
 
 # add names
@@ -323,10 +258,10 @@ trials <- trials %>%
   group_by(state) %>%
   mutate(trial = row_number()) %>%
   ungroup()
- 
+
 # add evs
 trials <- trials %>%
-  left_join(read_csv("data/state_evs.csv"))
+  left_join(read_csv("~/Desktop/state_evs.csv"))
 
 # sum up
 sim_evs <- trials %>%
@@ -340,7 +275,7 @@ p_dem_win
 
 # base win?
 predictions_2020 %>%
-  left_join(read_csv("data/state_evs.csv")) %>%
+  left_join(read_csv("~/Desktop/state_evs.csv")) %>%
   summarise(dem_ev = sum(ev * (dem_two_party_share_hat >= 0.5))) 
 
 
@@ -350,7 +285,7 @@ ggplot(sim_evs,aes(x=dem_ev,fill=ifelse(dem_ev>=270,'Democratic','Republican')))
   geom_histogram(binwidth=1) +
   scale_y_continuous(labels=function(x){
     paste0(round(x/nrow(sim_evs)*100),'%')
-    }) +
+  }) +
   scale_fill_manual(name='Winner',
                     values=c('Democratic'='blue',
                              'Republican'='red')) +
@@ -371,8 +306,8 @@ evs_pdf <- sim_evs %>%
   arrange(desc(dem_ev)) %>%
   mutate(cumprob = cumsum(prob))
 
-# ggplot(evs_pdf, aes(x=dem_ev,y=cumprob)) +
-#   geom_line() +
-#   theme_classic()
+ggplot(evs_pdf, aes(x=dem_ev,y=cumprob)) +
+  geom_line() +
+  theme_classic()
 
 
