@@ -245,29 +245,6 @@ score_among_polled <- sum(states2012[all_polled_states[-1],]$obama_count)/
 
 alpha_prior <- log(states2012$national_score[1]/score_among_polled)
 
-# First stage predictions -------
-N <- nrow(df)
-S <- 51
-s <- df$index_s
-n_respondents <- df$n_respondents
-n_two_parties <- df$n_clinton + df$n_trump
-
-data_1st <- list(
-  # dimensions
-  N = N,
-  S = S,
-  # index
-  s = s,
-  # data
-  n_respondents = n_respondents,
-  n_two_parties = n_two_parties
-)
-# model
-m_1st <- rstan::stan_model("scripts/Stan/Refactored/poll_model_1st_stage_v1.stan")
-# run
-out <- rstan::sampling(m_1st, data = data_1st, iter = 1000, chains = 2)
-# extract
-yrep_two_share <- as.integer(apply(rstan::extract(out, pars = "yrep")[[1]], MARGIN = 2, median))
 # Passing the data to Stan and running the model ---------
 N <- nrow(df)
 T <- T
@@ -280,8 +257,8 @@ poll <- df$index_p
 state_weights <- state_weights
 # data ---
 n_democrat <- df$n_clinton
-n_respondents <- df$n_clinton + df$n_trump
-pred_two_share <- yrep_two_share/df$n_respondents
+n_respondents <- df$n_respondents
+n_two_share <- df$n_clinton + df$n_trump
 # priors ---
 prior_sigma_measure_noise <- 0.01 ### 0.1 / 2
 prior_sigma_a <- 0.025 ### 0.05 / 2
@@ -291,6 +268,7 @@ prior_sigma_c <- 0.02 ### 0.1 / 2
 mu_alpha <- alpha_prior
 sigma_alpha <- 0.2  ### 0.2
 prior_delta_sigma <- 0.1 ### guess
+prior_chol_eta <- 2.0
 # data ---
 data <- list(
   N = N,
@@ -303,7 +281,7 @@ data <- list(
   state_weights = state_weights,
   n_democrat = n_democrat,
   n_respondents = n_respondents,
-  pred_two_share = pred_two_share,
+  n_two_share = n_two_share,
   current_T = as.integer(current_T),
   ss_correlation = state_correlation,
   ss_corr_mu_b_T = state_correlation_mu_b_T,
@@ -316,7 +294,8 @@ data <- list(
   prior_sigma_c = prior_sigma_c,
   mu_alpha = mu_alpha,
   sigma_alpha = sigma_alpha,
-  prior_delta_sigma = prior_delta_sigma
+  prior_delta_sigma = prior_delta_sigma,
+  prior_chol_eta = prior_chol_eta
 )
 
 ### Initialization ----
@@ -335,7 +314,8 @@ initf2 <- function(chain_id = 1) {
        sigma_measure_noise_state = abs(rnorm(1, 0, prior_sigma_measure_noise)),
        sigma_mu_c = abs(rnorm(1, 0, prior_sigma_c)),
        sigma_mu_a = abs(rnorm(1, 0, prior_sigma_a)),
-       sigma_mu_b = abs(rnorm(1, 0, prior_sigma_b))
+       sigma_mu_b = abs(rnorm(1, 0, prior_sigma_b)),
+       raw_eta = matrix(abs(rnorm(N * 2)), ncol = N, nrow = 2)
   )
 }
 
@@ -346,7 +326,7 @@ init_ll <- lapply(1:n_chains, function(id) initf2(chain_id = id))
 #setwd(here("scripts/Stan/Refactored/"))
 
 # read model code
-model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v10.stan")
+model <- rstan::stan_model("scripts/Stan/Third_party/poll_model_third_party_v1.stan")
 
 # run model
 out <- rstan::sampling(model, data = data,
