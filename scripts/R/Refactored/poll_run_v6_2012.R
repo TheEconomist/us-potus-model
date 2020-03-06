@@ -29,38 +29,38 @@ options(mc.cores = parallel::detectCores())
 
 
 cov_matrix <- function(n, sigma2, rho){
-    m <- matrix(nrow = n, ncol = n)
-    m[upper.tri(m)] <- rho
-    m[lower.tri(m)] <- rho
-    diag(m) <- 1
-    (sigma2^.5 * diag(n))  %*% m %*% (sigma2^.5 * diag(n))
+  m <- matrix(nrow = n, ncol = n)
+  m[upper.tri(m)] <- rho
+  m[lower.tri(m)] <- rho
+  diag(m) <- 1
+  (sigma2^.5 * diag(n))  %*% m %*% (sigma2^.5 * diag(n))
 }
 
 ## Master variables
-RUN_DATE <- min(ymd('2016-11-08'),Sys.Date())
+RUN_DATE <- min(ymd('2012-11-06'),Sys.Date())
 
-election_day <- ymd("2016-11-08")
-start_date <- as.Date("2016-03-01") # Keeping all polls after March 1, 2016
+election_day <- ymd("2012-11-06")
+start_date <- as.Date("2012-03-01") # Keeping all polls after March 1, 2016
 
 
 # wrangle polls -----------------------------------------------------------
 # read
 #setwd(here("data/"))
-all_polls <- read.csv("data/all_polls.csv", stringsAsFactors = FALSE, header = TRUE)
-
+all_polls <- read_csv('data/all_polls_2012.csv')
 
 # select relevant columns from HufFPost polls
 all_polls <- all_polls %>%
-  dplyr::select(state, pollster, number.of.observations, population, mode, 
+  dplyr::select(state, pollster, number.of.observations, mode,population,
                 start.date, 
                 end.date,
-                clinton, trump, undecided, other, johnson, mcmullin)
+                obama, romney, undecided, other)%>%
+  mutate(end.date = mdy(end.date),
+         start.date = mdy(start.date))
 
 
 # make sure we've got nothing from the futuree
 all_polls <- all_polls %>%
   filter(ymd(end.date) <= RUN_DATE)
-
 
 # basic mutations
 df <- all_polls %>% 
@@ -70,9 +70,6 @@ df <- all_polls %>%
          end   = ymd(end.date),
          t = end - (1 + as.numeric(end-begin)) %/% 2) %>%
   filter(t >= start_date & !is.na(t)
-         & (population == "Likely Voters" | 
-              population == "Registered Voters" | 
-              population == "Adults") # get rid of disaggregated polls
          & n > 1) 
 
 # pollster mutations
@@ -82,28 +79,25 @@ df <- df %>%
          pollster = replace(pollster, pollster == "WashPost", "Washington Post"),
          pollster = replace(pollster, pollster == "ABC News", "ABC"),
          undecided = ifelse(is.na(undecided), 0, undecided),
-         other = ifelse(is.na(other), 0, other) + 
-           ifelse(is.na(johnson), 0, johnson) + 
-           ifelse(is.na(mcmullin), 0, mcmullin))
+         other = ifelse(is.na(other), 0, other))
 
 # vote shares etc
 df <- df %>%
-  mutate(two_party_sum = clinton + trump,
+  mutate(two_party_sum = obama + romney,
          polltype = as.integer(as.character(recode(population, 
                                                    "Likely Voters" = "0", 
                                                    "Registered Voters" = "1",
                                                    "Adults" = "2"))), 
          n_respondents = round(n),
-         # clinton
-         n_clinton = round(n * clinton/100),
-         p_clinton = clinton/two_party_sum,
-         # trump
-         n_trump = round(n * trump/100),
-         p_trump = trump/two_party_sum,
+         # obama
+         n_obama = round(n * obama/100),
+         p_obama = obama/two_party_sum,
+         # romney
+         n_romney = round(n * romney/100),
+         p_romney = romney/two_party_sum,
          # third-party
          n_other = round(n * other/100),
          p_other = other/100)
-
 
 
 
@@ -112,11 +106,11 @@ df <- df %>%
 # create correlation matrix ---------------------------------------------
 
 #here("data")
-polls_2012 <- read.csv("data/potus_results_76_16.csv")
-polls_2012 <- polls_2012 %>% 
+polls_2008 <- read.csv("data/potus_results_76_16.csv")
+polls_2008 <- polls_2008 %>% 
   select(year, state, dem) %>%
   spread(state, dem) %>% select(-year)
-state_correlation <- cor(polls_2012)  
+state_correlation <- cor(polls_2008)  
 
 #state_correlation_error <- state_correlation # covariance for backward walk
 state_correlation_error <- cov_matrix(51, 0.1^2, .8) # 0.08^2
@@ -149,8 +143,8 @@ df <- df %>%
     # poll information
     state, t, begin, end, pollster, polltype, method = mode, n_respondents, 
     # vote shares
-    p_clinton, n_clinton, 
-    p_trump, n_trump, 
+    p_obama, n_obama, 
+    p_romney, n_romney, 
     p_other, n_other, poll_day, index_s, index_p, index_t) %>%
   mutate(index_s = ifelse(index_s == 1, 52, index_s - 1)) # national index = 51
 
@@ -173,45 +167,45 @@ all_pollsters <- levels(as.factor(as.character(df$pollster)))
 # (2) set priors on mu_b and alpha,
 # (3) get state_weights,           
 #setwd(here("data/"))
-states2012 <- read.csv("data/2012.csv", 
+states2008 <- read.csv("data/2008.csv", 
                        header = TRUE, stringsAsFactors = FALSE) %>% 
-  mutate(score = obama_count / (obama_count + romney_count),
-         national_score = sum(obama_count)/sum(obama_count + romney_count),
+  mutate(score = obama_count / (obama_count + mccain_count),
+         national_score = sum(obama_count)/sum(obama_count + mccain_count),
          delta = score - national_score,
          share_national_vote = (total_count*(1+adult_pop_growth_2011_15))
          /sum(total_count*(1+adult_pop_growth_2011_15))) %>%
   arrange(state) 
 
-rownames(states2012) <- states2012$state
+rownames(states2008) <- states2008$state
 
 # get state incdices
-all_states <- states2012$state
-state_name <- states2012$state_name
-names(state_name) <- states2012$state
+all_states <- states2008$state
+state_name <- states2008$state_name
+names(state_name) <- states2008$state
 
 # set prior differences
-prior_diff_score <- states2012$delta
+prior_diff_score <- states2008$delta
 names(prior_diff_score) <- all_states
 
 # set state weights
-state_weights <- c(states2012$share_national_vote / sum(states2012$share_national_vote))
-names(state_weights) <- c(states2012$state)
+state_weights <- c(states2008$share_national_vote / sum(states2008$share_national_vote))
+names(state_weights) <- c(states2008$state)
 
 # electoral votes, by state:
-ev_state <- states2012$ev
-names(ev_state) <- states2012$state
+ev_state <- states2008$ev
+names(ev_state) <- states2008$state
 
 
 ##### Creating priors --------------
 # read in abramowitz data
 #setwd(here("data/"))
-abramowitz <- read.csv('data/abramowitz_data.csv') %>% filter(year != 2016)
+abramowitz <- read.csv('data/abramowitz_data.csv') %>% filter(year < 2012)
 
 # train a caret model to predict demvote with incvote ~ q2gdp + juneapp + year:q2gdp + year:juneapp 
 prior_model <- caret::train(
   incvote ~ q2gdp + juneapp , #+ year:q2gdp + year:juneapp
   data = abramowitz,
-  #method = "glmnet",
+  method = "glm",
   trControl = trainControl(
     method = "LOOCV"),
   tuneLength = 50)
@@ -221,10 +215,10 @@ best_result = prior_model$results[best, ]
 rownames(best_result) = NULL
 best_result
 # make predictions
-national_mu_prior <- predict(prior_model,newdata = tibble(q2gdp = 1.1,
-                                                          juneapp = 4,
-                                                          year = 2016))
-cat(sprintf('Prior Clinton two-party vote is %s\nWith a standard error of %s',
+national_mu_prior <- predict(prior_model,newdata = tibble(q2gdp = 1.3,
+                                                          juneapp = 1))
+national_mu_prior <- 51.1
+cat(sprintf('Prior Obama two-party vote is %s\nWith a standard error of %s',
             round(national_mu_prior/100,3),round(best_result$RMSE/100,3)))
 # on correct scale
 national_mu_prior <- national_mu_prior / 100
@@ -239,18 +233,18 @@ mu_b_prior <- logit(national_mu_prior + prior_diff_score)
 # One problem until early September, was that voters in polled states were different from average voters :
 # Several solid red states still hadn't been polled, the weighted average of state polls was slightly more pro-Clinton than national polls.
 
-score_among_polled <- sum(states2012[all_polled_states[-1],]$obama_count)/
-  sum(states2012[all_polled_states[-1],]$obama_count + 
-        states2012[all_polled_states[-1],]$romney_count)
+score_among_polled <- sum(states2008[all_polled_states[-1],]$obama_count)/
+  sum(states2008[all_polled_states[-1],]$obama_count + 
+        states2008[all_polled_states[-1],]$mccain_count)
 
-alpha_prior <- log(states2012$national_score[1]/score_among_polled)
+alpha_prior <- log(states2008$national_score[1]/score_among_polled)
 
 # First stage predictions -------
 N <- nrow(df)
 S <- 51
 s <- df$index_s
 n_respondents <- df$n_respondents
-n_two_parties <- df$n_clinton + df$n_trump
+n_two_parties <- df$n_obama + df$n_romney
 
 data_1st <- list(
   # dimensions
@@ -279,8 +273,8 @@ day <- df$poll_day
 poll <- df$index_p
 state_weights <- state_weights
 # data ---
-n_democrat <- df$n_clinton
-n_respondents <- df$n_clinton + df$n_trump
+n_democrat <- df$n_obama
+n_respondents <- df$n_obama + df$n_romney
 pred_two_share <- yrep_two_share/df$n_respondents
 # priors ---
 prior_sigma_measure_noise <- 0.01 ### 0.1 / 2
@@ -356,7 +350,7 @@ out <- rstan::sampling(model, data = data,
 
 
 # save model for today
-write_rds(out, sprintf('stan_model_%s.rds',RUN_DATE),compress = 'gz')
+write_rds(out, sprintf('models/backtest_2012/stan_model_%s.rds',RUN_DATE),compress = 'gz')
 
 ### Extract results ----
 #out <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
@@ -370,23 +364,23 @@ hist(delta)
 # extract predictions
 predicted_score <- rstan::extract(out, pars = "predicted_score")[[1]]
 
-p_clinton <- pblapply(1:dim(predicted_score)[3],
-                       function(x){
-                         # pred is mu_a + mu_b for the past, just mu_b for the future
-                         p_clinton <- predicted_score[,,x]
-                         
-                         # put in tibble
-                         tibble(low = apply(p_clinton,2,function(x){(quantile(x,0.05))}),
-                                high = apply(p_clinton,2,function(x){(quantile(x,0.95))}),
-                                mean = apply(p_clinton,2,function(x){(mean(x))}),
-                                prob = apply(p_clinton,2,function(x){(mean(x>0.5))}),
-                                state = x) 
-                         
-                       }) %>% do.call('bind_rows',.)
+p_obama <- pblapply(1:dim(predicted_score)[3],
+                      function(x){
+                        # pred is mu_a + mu_b for the past, just mu_b for the future
+                        p_obama <- predicted_score[,,x]
+                        
+                        # put in tibble
+                        tibble(low = apply(p_obama,2,function(x){(quantile(x,0.05))}),
+                               high = apply(p_obama,2,function(x){(quantile(x,0.95))}),
+                               mean = apply(p_obama,2,function(x){(mean(x))}),
+                               prob = apply(p_obama,2,function(x){(mean(x>0.5))}),
+                               state = x) 
+                        
+                      }) %>% do.call('bind_rows',.)
 
-p_clinton$state = colnames(state_correlation)[p_clinton$state]
+p_obama$state = colnames(state_correlation)[p_obama$state]
 
-p_clinton <- p_clinton %>%
+p_obama <- p_obama %>%
   group_by(state) %>%
   mutate(t = row_number() + min(df$begin)) %>%
   ungroup()
@@ -395,42 +389,42 @@ ex_states <- c('IA','FL','OH','WI','MI','PA','AZ','NC','NH')
 
 # together
 # national vote = vote * state weights
-p_clinton <- p_clinton %>%
+p_obama <- p_obama %>%
   bind_rows(
-    p_clinton %>% 
-    left_join(enframe(state_weights,'state','weight')) %>%
-    group_by(t) %>%
-    summarise(mean = weighted.mean(mean,weight),
-              high = weighted.mean(high,weight),
-              low = weighted.mean(low,weight)) %>%
-    mutate(state='--')
+    p_obama %>% 
+      left_join(enframe(state_weights,'state','weight')) %>%
+      group_by(t) %>%
+      summarise(mean = weighted.mean(mean,weight),
+                high = weighted.mean(high,weight),
+                low = weighted.mean(low,weight)) %>%
+      mutate(state='--')
   )
 
 # look
-p_clinton %>% filter(t == max(t),state %in% ex_states) %>% mutate(se = (high - mean)/2)
+p_obama %>% filter(t == max(t),state %in% ex_states) %>% mutate(se = (high - mean)/2)
 
 
 # electoral college by simulation
 draws <- pblapply(1:dim(predicted_score)[3],
-             function(x){
-               # pred is mu_a + mu_b for the past, just mu_b for the future
-               p_clinton <- predicted_score[,,x]
-               
-               p_clinton <- p_clinton %>%
-                 as.data.frame() %>%
-                 mutate(draw = row_number()) %>%
-                 gather(t,p_clinton,1:(ncol(.)-1)) %>%
-                 mutate(t = as.numeric(gsub('V','',t)) + min(df$begin),
-                        state = colnames(state_correlation)[x]) 
-
-           
-         }) %>% do.call('bind_rows',.)
+                  function(x){
+                    # pred is mu_a + mu_b for the past, just mu_b for the future
+                    p_obama <- predicted_score[,,x]
+                    
+                    p_obama <- p_obama %>%
+                      as.data.frame() %>%
+                      mutate(draw = row_number()) %>%
+                      gather(t,p_obama,1:(ncol(.)-1)) %>%
+                      mutate(t = as.numeric(gsub('V','',t)) + min(df$begin),
+                             state = colnames(state_correlation)[x]) 
+                    
+                    
+                  }) %>% do.call('bind_rows',.)
 
 
 sim_evs <- draws %>%
-  left_join(states2012 %>% select(state,ev),by='state') %>%
+  left_join(states2008 %>% select(state,ev),by='state') %>%
   group_by(t,draw) %>%
-  summarise(dem_ev = sum(ev * (p_clinton > 0.5))) %>%
+  summarise(dem_ev = sum(ev * (p_obama > 0.5))) %>%
   group_by(t) %>%
   summarise(mean_dem_ev = mean(dem_ev),
             high_dem_ev = quantile(dem_ev,0.975),
@@ -441,23 +435,23 @@ sim_evs <- draws %>%
 # add identifier
 identifier <- paste0(Sys.Date()," || " , out@model_name)
 
-natl_polls.gg <- p_clinton %>%
+natl_polls.gg <- p_obama %>%
   filter(state == '--') %>%
-  left_join(df %>% select(state,t,p_clinton)) %>% # plot over time
+  left_join(df %>% select(state,t,p_obama)) %>% # plot over time
   # plot
   ggplot(.,aes(x=t)) +
   
   geom_ribbon(aes(ymin=low,ymax=high),col=NA,alpha=0.2) +
   geom_hline(yintercept = 0.5) +
   geom_hline(yintercept = national_mu_prior,linetype=2) +
-  geom_point(aes(y=p_clinton),alpha=0.5) +
-  #geom_smooth(aes(y=p_clinton),method='loess',span=0.2,col='black',linetype=2,se=F) +
+  geom_point(aes(y=p_obama),alpha=0.5) +
+  #geom_smooth(aes(y=p_obama),method='loess',span=0.2,col='black',linetype=2,se=F) +
   geom_line(aes(y=mean)) +
   facet_wrap(~state) +
   theme_minimal()  +
   theme(legend.position = 'none') +
-  scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b') +
-  labs(subtitle='p_clinton national')
+  scale_x_date(limits=c(ymd('2012-03-01','2012-11-06')),date_breaks='1 month',date_labels='%b') +
+  labs(subtitle='p_obama national')
 
 natl_evs.gg <-  ggplot(sim_evs, aes(x=t)) +
   geom_hline(yintercept = 270) +
@@ -465,24 +459,24 @@ natl_evs.gg <-  ggplot(sim_evs, aes(x=t)) +
   geom_ribbon(aes(ymin=low_dem_ev,ymax=high_dem_ev),alpha=0.2) +
   theme_minimal()  +
   theme(legend.position = 'none') +
-  scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b') +
-  labs(subtitletitle='clinton evs')
+  scale_x_date(limits=c(ymd('2012-03-01','2012-11-06')),date_breaks='1 month',date_labels='%b') +
+  labs(subtitletitle='obama evs')
 
-state_polls.gg <- p_clinton %>%
+state_polls.gg <- p_obama %>%
   filter(state %in% ex_states) %>%
-  left_join(df %>% select(state,t,p_clinton)) %>% # plot over time
+  left_join(df %>% select(state,t,p_obama)) %>% # plot over time
   # plot
   ggplot(.,aes(x=t,col=state)) +
   geom_ribbon(aes(ymin=low,ymax=high),col=NA,alpha=0.2) +
   geom_hline(yintercept = 0.5) +
-  geom_point(aes(y=p_clinton),alpha=0.5) +
-  #geom_smooth(aes(y=p_clinton,col=state),method='loess',linetype=2,se=F) +
+  geom_point(aes(y=p_obama),alpha=0.5) +
+  #geom_smooth(aes(y=p_obama,col=state),method='loess',linetype=2,se=F) +
   geom_line(aes(y=mean)) +
   facet_wrap(~state) +
   theme_minimal()  +
   theme(legend.position = 'none') +
-  scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b') +
-  labs(subtitle='p_clinton state')
+  scale_x_date(limits=c(ymd('2012-03-01','2012-11-06')),date_breaks='1 month',date_labels='%b') +
+  labs(subtitle='p_obama state')
 
 grid.arrange(natl_polls.gg, natl_evs.gg, state_polls.gg, 
              layout_matrix = rbind(c(1,1,3,3,3),
@@ -496,41 +490,35 @@ ggplot(sim_evs, aes(x=t)) +
   geom_hline(yintercept = 0.5) +
   geom_line(aes(y=prob))  +
   coord_cartesian(ylim=c(0,1)) +
-  geom_hline(data=tibble(forecaster = c('nyt',
-                                        'fivethirtyeight',
-                                        'huffpost',
-                                        'predictwise',
-                                        'pec',
-                                        'dailykos',
-                                        'morris16'),
-                         prob = c(0.85,0.71,0.98,0.89,0.99,0.92,0.84)),
+  geom_hline(data=tibble(forecaster = c('pec','fivethirtyeight'),
+                         prob = c(0.99,0.909)),
              aes(yintercept=prob,col=forecaster),linetype=2) +
   labs(subtitle = identifier)
 
 
 
 # now-cast probability over time all states
-p_clinton %>%
+p_obama %>%
   #filter(abs(mean-0.5)<0.2) %>%
   # plot
   ggplot(.,aes(x=t,y=prob,col=state)) +
   geom_hline(yintercept=0.5) +
   geom_line() +
-  geom_label_repel(data = p_clinton %>% 
+  geom_label_repel(data = p_obama %>% 
                      filter(t==max(t),
                             prob > 0.1 & prob < 0.9),
                    aes(label=state)) +
   theme_minimal()  +
   theme(legend.position = 'none') +
-  scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b') +
+  scale_x_date(limits=c(ymd('2012-03-01','2012-11-06')),date_breaks='1 month',date_labels='%b') +
   scale_y_continuous(breaks=seq(0,1,0.1)) +
   labs(subtitle = identifier)
 
 # diff from national over time?
-p_clinton[p_clinton$state != '--',] %>%
-  left_join(p_clinton[p_clinton$state=='--',] %>%
-              select(t,p_clinton_national=mean), by='t') %>%
-  mutate(diff=mean-p_clinton_national) %>%
+p_obama[p_obama$state != '--',] %>%
+  left_join(p_obama[p_obama$state=='--',] %>%
+              select(t,p_obama_national=mean), by='t') %>%
+  mutate(diff=mean-p_obama_national) %>%
   group_by(state) %>%
   mutate(last_prob = last(prob)) %>%
   filter(abs(last_prob-0.5)<0.4) %>%
@@ -543,17 +531,17 @@ p_clinton[p_clinton$state != '--',] %>%
                    aes(label=state)) +
   theme_minimal()  +
   theme(legend.position = 'none') +
-  scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b') +
+  scale_x_date(limits=c(ymd('2012-03-01','2012-11-06')),date_breaks='1 month',date_labels='%b') +
   scale_y_continuous(breaks=seq(-1,1,0.01)) +
   labs(subtitle = identifier)
 
 
 # final EV distribution
 draws %>%
-  left_join(states2012 %>% select(state,ev),by='state') %>%
+  left_join(states2008 %>% select(state,ev),by='state') %>%
   filter(t==max(t)) %>%
   group_by(draw) %>%
-  summarise(dem_ev = sum(ev* (p_clinton > 0.5))) %>%
+  summarise(dem_ev = sum(ev* (p_obama > 0.5))) %>%
   ggplot(.,aes(x=dem_ev,
                fill=ifelse(dem_ev>=270,'Democratic','Republican'))) +
   geom_vline(xintercept = 270) +
@@ -563,25 +551,4 @@ draws %>%
         panel.grid.minor = element_blank()) +
   scale_fill_manual(name='Electoral College winner',values=c('Democratic'='blue','Republican'='red')) +
   labs(x='Democratic electoral college votes')
-
-# brier scores
-# https://www.buzzfeednews.com/article/jsvine/2016-election-forecast-grades
-compare <- p_clinton %>% 
-  filter(t==max(t),state!='--') %>% 
-  select(state,clinton_win=prob) %>% 
-  mutate(clinton_win_actual = ifelse(state %in% c('CA','NV','OR','WA','CO','NM','MN','IL','VA','DC','MD','DE','NJ','CT','RI','MA','NH','VT','NY','HI','ME'),1,0),
-         diff = (clinton_win_actual - clinton_win )^2) %>% left_join(enframe(ev_state) %>% set_names(.,c('state','ev'))) %>% 
-  mutate(ev_weight = ev/(sum(ev))) 
-
-
-tibble(outlet = c('538 polls-plus','538 polls-only','princeton','nyt upshot','kremp/slate','pollsavvy','predictwise markets','predictwise overall','desart and holbrook','daily kos','huffpost'),
-       ev_wtd_brier = c(0.0928,0.0936,0.1169,0.1208,0.121,0.1219,0.1272,0.1276,0.1279,0.1439,0.1505),
-       unwtd_brier = c(0.0664,0.0672,0.0744,0.0801,0.0766,0.0794,0.0767,0.0783,0.0825,0.0864,0.0892),
-       states_correct = c(46,46,47,46,46,46,46,46,44,46,46)) %>% 
-  bind_rows(tibble(outlet='economist (backtest)',
-                   ev_wtd_brier = weighted.mean(compare$diff, compare$ev_weight),
-                   unwtd_brier = mean(compare$diff),
-                   states_correct=sum(round(compare$clinton_win) == round(compare$clinton_win_actual)))) %>%
-  arrange(ev_wtd_brier) 
-
 
