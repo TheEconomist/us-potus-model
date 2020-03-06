@@ -172,8 +172,8 @@ states2008 <- read.csv("data/2008.csv",
   mutate(score = obama_count / (obama_count + mccain_count),
          national_score = sum(obama_count)/sum(obama_count + mccain_count),
          delta = score - national_score,
-         share_national_vote = (total_count*(1+adult_pop_growth_2011_15))
-         /sum(total_count*(1+adult_pop_growth_2011_15))) %>%
+         share_national_vote = (total_count)
+         /sum(total_count)) %>%
   arrange(state) 
 
 rownames(states2008) <- states2008$state
@@ -353,7 +353,7 @@ out <- rstan::sampling(model, data = data,
 write_rds(out, sprintf('models/backtest_2012/stan_model_%s.rds',RUN_DATE),compress = 'gz')
 
 ### Extract results ----
-#out <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
+out  <- read_rds(sprintf('models/backtest_2012/stan_model_%s.rds',RUN_DATE))
 
 # etc
 a <- rstan::extract(out, pars = "alpha")[[1]]
