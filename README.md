@@ -7,10 +7,11 @@ Improving on Kremp/Gelman's implementation of Linzer's dynamic linear model.
 
 ## TODO:
 
-- [ ] rewrite model with correlation matrix
-- [ ] add 3rd party step 
-- [ ] add correction for partisan survey composition
 - [x] find a better prior (approval/favorability lm)
+- [x] rewrite model with correlation matrix
+- [x] add 3rd party step 
+- [ ] add correction for partisan survey composition
+- [ ] optimize various error terms
 
 
 ## Model design

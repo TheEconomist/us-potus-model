@@ -265,7 +265,7 @@ data_1st <- list(
 # model
 m_1st <- rstan::stan_model("scripts/Stan/Refactored/poll_model_1st_stage_v1.stan")
 # run
-out <- rstan::sampling(m_1st, data = data_1st, iter = 1000, chains = 2)
+out <- rstan::sampling(m_1st, data = data_1st, iter = 2000,warmup=500, chains = 2)
 # extract
 yrep_two_share <- as.integer(apply(rstan::extract(out, pars = "yrep")[[1]], MARGIN = 2, median))
 # Passing the data to Stan and running the model ---------
@@ -351,7 +351,7 @@ model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v10.stan")
 # run model
 out <- rstan::sampling(model, data = data,
                        refresh=50,
-                       chains = 2, iter = 1000, warmup=500, init = init_ll
+                       chains = 2, iter = 2000, warmup=500, init = init_ll
 )
 
 
@@ -359,6 +359,8 @@ out <- rstan::sampling(model, data = data,
 write_rds(out, sprintf('stan_model_%s.rds',RUN_DATE),compress = 'gz')
 
 ### Extract results ----
+#out <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
+
 # etc
 a <- rstan::extract(out, pars = "alpha")[[1]]
 hist(a)
@@ -435,7 +437,6 @@ sim_evs <- draws %>%
             low_dem_ev = quantile(dem_ev,0.025),
             prob = mean(dem_ev >= 270))
 
-# plot votes and forecast together
 
 # add identifier
 identifier <- paste0(Sys.Date()," || " , out@model_name)
@@ -508,8 +509,9 @@ ggplot(sim_evs, aes(x=t)) +
 
 
 
-# probabilities over time
+# now-cast probability over time all states
 p_clinton %>%
+  #filter(abs(mean-0.5)<0.2) %>%
   # plot
   ggplot(.,aes(x=t,y=prob,col=state)) +
   geom_hline(yintercept=0.5) +
@@ -523,6 +525,28 @@ p_clinton %>%
   scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b') +
   scale_y_continuous(breaks=seq(0,1,0.1)) +
   labs(subtitle = identifier)
+
+# diff from national over time?
+p_clinton[p_clinton$state != '--',] %>%
+  left_join(p_clinton[p_clinton$state=='--',] %>%
+              select(t,p_clinton_national=mean), by='t') %>%
+  mutate(diff=mean-p_clinton_national) %>%
+  group_by(state) %>%
+  mutate(last_prob = last(prob)) %>%
+  filter(abs(last_prob-0.5)<0.3) %>%
+  ggplot(.,aes(x=t,y=diff,col=state)) +
+  geom_hline(yintercept=0.0) +
+  geom_line() +
+  geom_label_repel(data = . %>% 
+                     filter(t==max(t),
+                            prob > 0.1 & prob < 0.9),
+                   aes(label=state)) +
+  theme_minimal()  +
+  theme(legend.position = 'none') +
+  scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b') +
+  scale_y_continuous(breaks=seq(-1,1,0.01)) +
+  labs(subtitle = identifier)
+
 
 # final EV distribution
 draws %>%
@@ -539,4 +563,26 @@ draws %>%
         panel.grid.minor = element_blank()) +
   scale_fill_manual(name='Electoral College winner',values=c('Democratic'='blue','Republican'='red')) +
   labs(x='Democratic electoral college votes')
+
+# brier scores
+# https://www.buzzfeednews.com/article/jsvine/2016-election-forecast-grades
+
+compare <- p_clinton %>% 
+  filter(t==max(t),state!='--') %>% 
+  select(state,clinton_win=prob) %>% 
+  mutate(clinton_win_actual = ifelse(state %in% c('CA','NV','OR','WA','CO','NM','MN','IL','VA','DC','MD','DE','NJ','CT','RI','MA','NH','VT','NY','HI','ME'),1,0),
+         diff = (clinton_win_actual - clinton_win )^2) %>% left_join(enframe(ev_state) %>% set_names(.,c('state','ev'))) %>% 
+  mutate(ev_weight = ev/(sum(ev))) 
+
+
+tibble(outlet = c('538 polls-plus','538 polls-only','princeton','nyt upshot','kremp/slate','pollsavvy','predictwise markets','predictwise overall','desart and holbrook','daily kos','huffpost'),
+       ev_wtd_brier = c(0.0928,0.0936,0.1169,0.1208,0.121,0.1219,0.1272,0.1276,0.1279,0.1439,0.1505),
+       unwtd_brier = c(0.0664,0.0672,0.0744,0.0801,0.0766,0.0794,0.0767,0.0783,0.0825,0.0864,0.0892),
+       states_correct = c(46,46,47,46,46,46,46,46,44,46,46)) %>% 
+  bind_rows(tibble(outlet='economist (backtest)',
+                   ev_wtd_brier = weighted.mean(compare$diff, compare$ev_weight),
+                   unwtd_brier = mean(compare$diff),
+                   states_correct=sum(round(compare$clinton_win) == round(compare$clinton_win_actual)))) %>%
+  arrange(ev_wtd_brier) 
+
 
