@@ -284,8 +284,8 @@ n_respondents <- df$n_clinton + df$n_trump
 pred_two_share <- yrep_two_share/df$n_respondents
 # priors ---
 prior_sigma_measure_noise <- 0.01 ### 0.1 / 2
-prior_sigma_a <- 0.025 ### 0.05 / 2
-prior_sigma_b <- 0.03 ### 0.05 / 2
+prior_sigma_a <- 0.03 ### 0.05 / 2
+prior_sigma_b <- 0.04 ### 0.05 / 2
 mu_b_prior <- mu_b_prior
 prior_sigma_c <- 0.02 ### 0.1 / 2
 mu_alpha <- alpha_prior

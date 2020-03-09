@@ -367,6 +367,11 @@ for (i in 1:3){
   }
 }
 
+# the top model is the preferred model
+loo::loo_compare(lapply(df_save,function(x){x$loo}))
+
+df_save[[6]]
+
 # save model for today
 write_rds(df_save, sprintf('loo_stan_model_sigma_%s.rds',RUN_DATE),compress = 'gz')
 
