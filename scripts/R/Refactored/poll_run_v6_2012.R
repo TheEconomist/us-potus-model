@@ -109,11 +109,15 @@ df <- df %>%
 polls_2008 <- read.csv("data/potus_results_76_16.csv")
 polls_2008 <- polls_2008 %>% 
   select(year, state, dem) %>%
-  spread(state, dem) %>% select(-year)
+  group_by(state) %>%
+  mutate(dem = dem - lag(dem)) %>%
+  spread(state, dem) %>% 
+  na.omit() %>%
+  select(-year)
 state_correlation <- cor(polls_2008)  
 
 #state_correlation_error <- state_correlation # covariance for backward walk
-state_correlation_error <- cov_matrix(51, 0.1^2, .8) # 0.08^2
+state_correlation_error <- cov_matrix(51, 0.07^2, .8) # 0.08^2
 state_correlation_error <- state_correlation_error * state_correlation
 
 #state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
@@ -217,7 +221,7 @@ best_result
 # make predictions
 national_mu_prior <- predict(prior_model,newdata = tibble(q2gdp = 1.3,
                                                           juneapp = 1))
-national_mu_prior <- 51.1
+#national_mu_prior <- 51.1
 cat(sprintf('Prior Obama two-party vote is %s\nWith a standard error of %s',
             round(national_mu_prior/100,3),round(best_result$RMSE/100,3)))
 # on correct scale
@@ -226,7 +230,6 @@ national_sigma_prior <- best_result$RMSE / 100
 # Mean of the mu_b_prior
 # 0.486 is the predicted Clinton share of the national vote according to the Lewis-Beck & Tien model
 # https://pollyvote.com/en/components/econometric-models/lewis-beck-tien/
-mu_b_prior <- logit(national_mu_prior + c("--" = 0, prior_diff_score))
 mu_b_prior <- logit(national_mu_prior + prior_diff_score)
 
 # The model uses national polls to complement state polls when estimating the national term mu_a.
@@ -259,7 +262,7 @@ data_1st <- list(
 # model
 m_1st <- rstan::stan_model("scripts/Stan/Refactored/poll_model_1st_stage_v1.stan")
 # run
-out <- rstan::sampling(m_1st, data = data_1st, iter = 2000,warmup=500, chains = 2)
+out <- rstan::sampling(m_1st, data = data_1st, iter = 1000,warmup=500, chains = 2)
 # extract
 yrep_two_share <- as.integer(apply(rstan::extract(out, pars = "yrep")[[1]], MARGIN = 2, median))
 # Passing the data to Stan and running the model ---------
@@ -345,7 +348,7 @@ model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v10.stan")
 # run model
 out <- rstan::sampling(model, data = data,
                        refresh=50,
-                       chains = 2, iter = 2000, warmup=500, init = init_ll
+                       chains = 2, iter = 1000, warmup=500, init = init_ll
 )
 
 
@@ -444,7 +447,7 @@ natl_polls.gg <- p_obama %>%
   geom_ribbon(aes(ymin=low,ymax=high),col=NA,alpha=0.2) +
   geom_hline(yintercept = 0.5) +
   geom_hline(yintercept = national_mu_prior,linetype=2) +
-  geom_point(aes(y=p_obama),alpha=0.5) +
+  geom_point(aes(y=p_obama),alpha=0.3) +
   #geom_smooth(aes(y=p_obama),method='loess',span=0.2,col='black',linetype=2,se=F) +
   geom_line(aes(y=mean)) +
   facet_wrap(~state) +
@@ -469,7 +472,7 @@ state_polls.gg <- p_obama %>%
   ggplot(.,aes(x=t,col=state)) +
   geom_ribbon(aes(ymin=low,ymax=high),col=NA,alpha=0.2) +
   geom_hline(yintercept = 0.5) +
-  geom_point(aes(y=p_obama),alpha=0.5) +
+  geom_point(aes(y=p_obama),alpha=0.3) +
   #geom_smooth(aes(y=p_obama,col=state),method='loess',linetype=2,se=F) +
   geom_line(aes(y=mean)) +
   facet_wrap(~state) +
@@ -537,18 +540,39 @@ p_obama[p_obama$state != '--',] %>%
 
 
 # final EV distribution
-draws %>%
+final_evs <- draws %>%
   left_join(states2008 %>% select(state,ev),by='state') %>%
   filter(t==max(t)) %>%
   group_by(draw) %>%
-  summarise(dem_ev = sum(ev* (p_obama > 0.5))) %>%
-  ggplot(.,aes(x=dem_ev,
+  summarise(dem_ev = sum(ev* (p_obama > 0.5)))
+  
+ggplot(final_evs,aes(x=dem_ev,
                fill=ifelse(dem_ev>=270,'Democratic','Republican'))) +
   geom_vline(xintercept = 270) +
   geom_histogram(binwidth=1) +
   theme_minimal() +
   theme(legend.position = 'top',
         panel.grid.minor = element_blank()) +
-  scale_fill_manual(name='Electoral College winner',values=c('Democratic'='blue','Republican'='red')) +
-  labs(x='Democratic electoral college votes')
+  scale_fill_manual(name='Electoral College winner',values=c('Democratic'='#3A4EB1','Republican'='#E40A04')) +
+  labs(x='Democratic electoral college votes',
+       subtitle=sprintf("p(dem win) = %s",mean(final_evs$dem_ev>=270)))
+
+
+# brier scores
+# https://www.buzzfeednews.com/article/jsvine/2016-election-forecast-grades
+compare <- p_obama %>% 
+  filter(t==max(t),state!='--') %>% 
+  select(state,obama_win = prob) %>% 
+  mutate(obama_win_actual = ifelse(state %in% c('CA','NV','OR','WA','CO','NM','MN','IL','VA','DC','MD','DE','NJ','CT','RI','MA','NH','VT','NY','HI','ME','MI','IA','OH','PA','WI','FL'),1,0),
+         diff = (obama_win_actual - obama_win )^2) %>% 
+  left_join(enframe(ev_state) %>% set_names(.,c('state','ev'))) %>% 
+  mutate(ev_weight = ev/(sum(ev))) 
+
+
+tibble(outlet='economist (backtest)',
+       ev_wtd_brier = weighted.mean(compare$diff, compare$ev_weight),
+       unwtd_brier = mean(compare$diff),
+       states_correct=sum(round(compare$obama_win) == round(compare$obama_win_actual)))
+
+
 

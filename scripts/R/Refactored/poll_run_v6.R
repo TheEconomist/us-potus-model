@@ -549,20 +549,22 @@ p_clinton[p_clinton$state != '--',] %>%
 
 
 # final EV distribution
-draws %>%
-  left_join(states2012 %>% select(state,ev),by='state') %>%
+final_evs <- draws %>%
+  left_join(states2008 %>% select(state,ev),by='state') %>%
   filter(t==max(t)) %>%
   group_by(draw) %>%
-  summarise(dem_ev = sum(ev* (p_clinton > 0.5))) %>%
-  ggplot(.,aes(x=dem_ev,
-               fill=ifelse(dem_ev>=270,'Democratic','Republican'))) +
+  summarise(dem_ev = sum(ev* (p_clinton > 0.5)))
+
+ggplot(final_evs,aes(x=dem_ev,
+                     fill=ifelse(dem_ev>=270,'Democratic','Republican'))) +
   geom_vline(xintercept = 270) +
   geom_histogram(binwidth=1) +
   theme_minimal() +
   theme(legend.position = 'top',
         panel.grid.minor = element_blank()) +
-  scale_fill_manual(name='Electoral College winner',values=c('Democratic'='blue','Republican'='red')) +
-  labs(x='Democratic electoral college votes')
+  scale_fill_manual(name='Electoral College winner',values=c('Democratic'='#3A4EB1','Republican'='#E40A04')) +
+  labs(x='Democratic electoral college votes',
+       subtitle=sprintf("p(dem win) = %s",mean(final_evs$dem_ev>=270)))
 
 # brier scores
 # https://www.buzzfeednews.com/article/jsvine/2016-election-forecast-grades
