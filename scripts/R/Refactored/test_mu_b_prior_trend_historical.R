@@ -5,8 +5,7 @@ library(urbnmapr)
 library(caret)
 
 # functions
-rmse <- function(x){sqrt(mean(x^2))}
-
+rmse <- function(x){sqrt(mean(x^2,na.rm=T))}
 
 
 # start loop --------------------------------------------------------------
@@ -133,5 +132,8 @@ ALL_PREDICTIONS %>%
   group_by(year) %>%
   summarise(model_error = rmse(pred - actual),
             lag_error = rmse(prior - actual))
+
+
+
 
 

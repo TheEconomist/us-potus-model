@@ -265,7 +265,7 @@ data_1st <- list(
 # model
 m_1st <- rstan::stan_model("scripts/Stan/Refactored/poll_model_1st_stage_v1.stan")
 # run
-out <- rstan::sampling(m_1st, data = data_1st, iter = 2000,warmup=500, chains = 2)
+out <- rstan::sampling(m_1st, data = data_1st, iter = 1000,warmup=500, chains = 2)
 # extract
 yrep_two_share <- as.integer(apply(rstan::extract(out, pars = "yrep")[[1]], MARGIN = 2, median))
 # Passing the data to Stan and running the model ---------
@@ -351,7 +351,7 @@ model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v10.stan")
 # run model
 out <- rstan::sampling(model, data = data,
                        refresh=50,
-                       chains = 2, iter = 2000, warmup=500, init = init_ll
+                       chains = 2, iter = 1000, warmup=500, init = init_ll
 )
 
 
@@ -550,7 +550,7 @@ p_clinton[p_clinton$state != '--',] %>%
 
 # final EV distribution
 final_evs <- draws %>%
-  left_join(states2008 %>% select(state,ev),by='state') %>%
+  left_join(states2012 %>% select(state,ev),by='state') %>%
   filter(t==max(t)) %>%
   group_by(draw) %>%
   summarise(dem_ev = sum(ev* (p_clinton > 0.5)))

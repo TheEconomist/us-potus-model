@@ -100,7 +100,6 @@ df <- df %>%
          p_other = other/100)
 
 
-
 # prepare stan date -----------------------------------------------------------
 
 # create correlation matrix ---------------------------------------------
@@ -117,11 +116,11 @@ polls_2008 <- polls_2008 %>%
 state_correlation <- cor(polls_2008)  
 
 #state_correlation_error <- state_correlation # covariance for backward walk
-state_correlation_error <- cov_matrix(51, 0.07^2, .8) # 0.08^2
+state_correlation_error <- cov_matrix(51, 0.1^2, .8) # 0.08^2
 state_correlation_error <- state_correlation_error * state_correlation
 
 #state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
-state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 1/20, rho = 0.5) #1/20
+state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.072, rho = 0.5) #1/20
 state_correlation_mu_b_T <- state_correlation_mu_b_T * state_correlation
 
 # state_correlation_mu_b_walk <- state_correlation
@@ -432,7 +431,11 @@ sim_evs <- draws %>%
   summarise(mean_dem_ev = mean(dem_ev),
             high_dem_ev = quantile(dem_ev,0.975),
             low_dem_ev = quantile(dem_ev,0.025),
-            prob = mean(dem_ev >= 270))
+            prob = mean(dem_ev >= 270)) %>%
+  left_join(p_obama[p_obama$state != '--',] %>%
+              left_join(states2008 %>% select(state,ev),by='state') %>%
+              group_by(t) %>%
+              summarise(sum_dem_ev = sum(ev * (prob > 0.5))) )
 
 
 # add identifier
@@ -459,6 +462,7 @@ natl_polls.gg <- p_obama %>%
 natl_evs.gg <-  ggplot(sim_evs, aes(x=t)) +
   geom_hline(yintercept = 270) +
   geom_line(aes(y=mean_dem_ev)) +
+  geom_line(aes(y=sum_dem_ev),linetype=2) +
   geom_ribbon(aes(ymin=low_dem_ev,ymax=high_dem_ev),alpha=0.2) +
   theme_minimal()  +
   theme(legend.position = 'none') +
@@ -478,7 +482,7 @@ state_polls.gg <- p_obama %>%
   facet_wrap(~state) +
   theme_minimal()  +
   theme(legend.position = 'none') +
-  scale_x_date(limits=c(ymd('2012-03-01','2012-11-06')),date_breaks='1 month',date_labels='%b') +
+  scale_x_date(limits=c(ymd('2012-08-01','2012-11-06')),date_breaks='1 month',date_labels='%b') +
   labs(subtitle='p_obama state')
 
 grid.arrange(natl_polls.gg, natl_evs.gg, state_polls.gg, 
@@ -573,6 +577,19 @@ tibble(outlet='economist (backtest)',
        ev_wtd_brier = weighted.mean(compare$diff, compare$ev_weight),
        unwtd_brier = mean(compare$diff),
        states_correct=sum(round(compare$obama_win) == round(compare$obama_win_actual)))
+
+# margins v 538
+p_obama %>% 
+  filter(t==max(t),
+         state %in% c('CO','FL','IA','MI','NV','NH','NC','OH','PA','VA','WI')) %>% 
+  mutate(obama_margin_economist = (mean - 0.5)*100) %>%
+  select(state,obama_margin_economist) %>%
+  left_join(tibble(state = c('CO','FL','IA','MI','NV','NH','NC','OH','PA','VA','WI'),
+                   obama_margin_538 = c(2.5, 0, 3.2, 7.1, 4.5, 3.5, -1.7, 3.6, 5.9, 2.0, 5.5),
+                   obama_margin_actual = c(4.65, 0.5, 5.58, 8.67, 6.57, 5.8, -2.2, 1.9, 5.2, 3.0, 6.7))) %>%
+  mutate(error_economist = obama_margin_economist - obama_margin_actual,
+         error_538 = obama_margin_538 - obama_margin_actual) %>%
+  select(state, error_economist, error_538)
 
 
 

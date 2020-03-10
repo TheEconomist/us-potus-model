@@ -11,6 +11,50 @@ library(pbapply)
 library(lqmm)
 library(mvtnorm)
 
+rmse <- function(x){sqrt(mean(x^2,na.rm=T))}
+
+
+# naive; just get error on state_vote ~ national_pred + lag_lean ----------
+# get results
+results <- politicaldata::pres_results 
+
+# make two-party
+results <- results %>% 
+  mutate(two_party_votes = (dem + rep) * total_votes,
+         dem_two_party_share = dem / (dem + rep)) %>%
+  dplyr::select(state,year,dem_two_party_share,two_party_votes) 
+
+# get state-level lean
+results <- results %>%
+  group_by(year) %>%
+  mutate(national_dem_two_party_share = sum(dem_two_party_share * two_party_votes)/sum(two_party_votes)) %>%
+  mutate(dem_two_party_share_lean = dem_two_party_share - national_dem_two_party_share) %>%
+  group_by(state) %>%
+  mutate(dem_two_party_share_lean_lag = lag(dem_two_party_share_lean)) %>%
+  ungroup()
+
+# get dem predictions for that year
+abramowitz <- read.csv('data/abramowitz_data.csv') 
+
+# train a caret model to predict demvote with incvote ~ q2gdp + juneapp + year:q2gdp + year:juneapp 
+prior_model <- lm(incvote ~ q2gdp + juneapp , #+ year:q2gdp + year:juneapp
+                  data = abramowitz)
+
+national_preds = tibble(year = abramowitz$year,
+                        pred_two_party_national = fitted(prior_model)/100)
+
+# add to national, generate predictions
+results <- results %>%
+  left_join(national_preds, by = "year") %>%
+  mutate(dem_share_vote_year_prediction = dem_two_party_share_lean_lag + pred_two_party_national,
+  )
+
+
+rmse(results$dem_share_vote_year_prediction  -  results$dem_two_party_share)
+
+
+
+
 # fit national model ------------------------------------------------------
 abramowitz <- read.csv('data/abramowitz_data.csv')  %>%
   left_join(read.csv('data/ANES_swing_voters.csv')) %>%
