@@ -120,7 +120,7 @@ state_correlation_error <- cov_matrix(51, 0.1^2, .8) # 0.08^2
 state_correlation_error <- state_correlation_error * state_correlation
 
 #state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
-state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.072, rho = 0.5) #1/20
+state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.09, rho = 0.5) #1/20
 state_correlation_mu_b_T <- state_correlation_mu_b_T * state_correlation
 
 # state_correlation_mu_b_walk <- state_correlation
@@ -342,7 +342,9 @@ init_ll <- lapply(1:n_chains, function(id) initf2(chain_id = id))
 #setwd(here("scripts/Stan/Refactored/"))
 
 # read model code
-model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v9.stan")
+#model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v10.stan")
+model <- rstan::stan_model("scripts/Stan/Testing_refactored_v10/poll_model_no_state_to_national.stan")
+
 
 # run model
 out <- rstan::sampling(model, data = data,

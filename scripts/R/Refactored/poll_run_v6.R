@@ -246,13 +246,7 @@ score_among_polled <- sum(states2012[all_polled_states[-1],]$obama_count)/
 alpha_prior <- log(states2012$national_score[1]/score_among_polled)
 
 
-y <- mvrnorm(1000, mu_b_prior, Sigma = state_correlation_mu_b_T)
-
-inv.logit(apply(y, MARGIN = 2, mean))
-
-inv.logit(apply(y, MARGIN = 2, mean) + 1.96 * apply(y, MARGIN = 2, sd))
-
-inv.logit(apply(y, MARGIN = 2, mean) - 1.96 * apply(y, MARGIN = 2, sd)) #for 95% CI
+y <- MASS::mvrnorm(1000, mu_b_prior, Sigma = state_correlation_error)
 
 cbind(
   inv.logit(apply(y, MARGIN = 2, mean)),
