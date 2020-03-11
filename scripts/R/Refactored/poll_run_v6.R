@@ -533,7 +533,7 @@ p_clinton[p_clinton$state != '--',] %>%
   mutate(diff=mean-p_clinton_national) %>%
   group_by(state) %>%
   mutate(last_prob = last(prob)) %>%
-  filter(abs(last_prob-0.5)<0.4) %>%
+  filter(state %in% ex_states) %>%
   ggplot(.,aes(x=t,y=diff,col=state)) +
   geom_hline(yintercept=0.0) +
   geom_line() +

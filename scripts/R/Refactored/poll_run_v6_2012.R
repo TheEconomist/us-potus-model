@@ -342,7 +342,7 @@ init_ll <- lapply(1:n_chains, function(id) initf2(chain_id = id))
 #setwd(here("scripts/Stan/Refactored/"))
 
 # read model code
-model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v10.stan")
+model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v9.stan")
 
 # run model
 out <- rstan::sampling(model, data = data,
@@ -387,7 +387,7 @@ p_obama <- p_obama %>%
   mutate(t = row_number() + min(df$begin)) %>%
   ungroup()
 
-ex_states <- c('IA','FL','OH','WI','MI','PA','AZ','NC','NH')
+ex_states <- c('IA','FL','OH','WI','MI','PA','VA','NC','NH')
 
 # together
 # national vote = vote * state weights
@@ -403,8 +403,21 @@ p_obama <- p_obama %>%
   )
 
 # look
-p_obama %>% filter(t == max(t),state %in% ex_states) %>% mutate(se = (high - mean)/2)
+p_obama %>% filter(t == max(t),state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/2)
 
+p_obama[p_obama$state != '--',] %>% group_by(t) %>% summarise(mean_se=mean((high-mean)/2)) %>%
+  ggplot(.,aes(x=t,y=mean_se)) + 
+  geom_line()
+
+urbnmapr::states %>%
+  left_join(p_obama %>% filter(t == max(t)) %>%
+              select(state_abbv=state,prob)) %>%
+  ggplot(aes(x=long,y=lat,group=group,fill=prob)) +
+  geom_polygon()  + 
+  coord_map("albers",lat0=39, lat1=45) +
+  scale_fill_gradient2(high='blue',low='red',mid='white',midpoint=0.5) +
+  theme_void()
+  
 
 # electoral college by simulation
 draws <- pblapply(1:dim(predicted_score)[3],
@@ -429,6 +442,7 @@ sim_evs <- draws %>%
   summarise(dem_ev = sum(ev * (p_obama > 0.5))) %>%
   group_by(t) %>%
   summarise(mean_dem_ev = mean(dem_ev),
+            median_dem_ev = median(dem_ev),
             high_dem_ev = quantile(dem_ev,0.975),
             low_dem_ev = quantile(dem_ev,0.025),
             prob = mean(dem_ev >= 270)) %>%
@@ -462,7 +476,7 @@ natl_polls.gg <- p_obama %>%
 natl_evs.gg <-  ggplot(sim_evs, aes(x=t)) +
   geom_hline(yintercept = 270) +
   geom_line(aes(y=mean_dem_ev)) +
-  geom_line(aes(y=sum_dem_ev),linetype=2) +
+  geom_line(aes(y=median_dem_ev),linetype=2) +
   geom_ribbon(aes(ymin=low_dem_ev,ymax=high_dem_ev),alpha=0.2) +
   theme_minimal()  +
   theme(legend.position = 'none') +
@@ -482,7 +496,7 @@ state_polls.gg <- p_obama %>%
   facet_wrap(~state) +
   theme_minimal()  +
   theme(legend.position = 'none') +
-  scale_x_date(limits=c(ymd('2012-08-01','2012-11-06')),date_breaks='1 month',date_labels='%b') +
+  scale_x_date(limits=c(ymd('2012-03-01','2012-11-06')),date_breaks='1 month',date_labels='%b') +
   labs(subtitle='p_obama state')
 
 grid.arrange(natl_polls.gg, natl_evs.gg, state_polls.gg, 
@@ -528,13 +542,13 @@ p_obama[p_obama$state != '--',] %>%
   mutate(diff=mean-p_obama_national) %>%
   group_by(state) %>%
   mutate(last_prob = last(prob)) %>%
-  filter(abs(last_prob-0.5)<0.4) %>%
+  filter(state %in% ex_states) %>%
   ggplot(.,aes(x=t,y=diff,col=state)) +
   geom_hline(yintercept=0.0) +
   geom_line() +
   geom_label_repel(data = . %>% 
                      filter(t==max(t),
-                            prob > 0.1 & prob < 0.9),
+                            state %in% ex_states),
                    aes(label=state)) +
   theme_minimal()  +
   theme(legend.position = 'none') +
@@ -542,6 +556,7 @@ p_obama[p_obama$state != '--',] %>%
   scale_y_continuous(breaks=seq(-1,1,0.01)) +
   labs(subtitle = identifier)
 
+# avg standard error over time
 
 # final EV distribution
 final_evs <- draws %>%
@@ -559,7 +574,7 @@ ggplot(final_evs,aes(x=dem_ev,
         panel.grid.minor = element_blank()) +
   scale_fill_manual(name='Electoral College winner',values=c('Democratic'='#3A4EB1','Republican'='#E40A04')) +
   labs(x='Democratic electoral college votes',
-       subtitle=sprintf("p(dem win) = %s",mean(final_evs$dem_ev>=270)))
+       subtitle=sprintf("p(dem win) = %s",round(mean(final_evs$dem_ev>=270),3)))
 
 
 # brier scores
@@ -578,6 +593,7 @@ tibble(outlet='economist (backtest)',
        unwtd_brier = mean(compare$diff),
        states_correct=sum(round(compare$obama_win) == round(compare$obama_win_actual)))
 
+
 # margins v 538
 p_obama %>% 
   filter(t==max(t),
@@ -592,4 +608,13 @@ p_obama %>%
   select(state, error_economist, error_538)
 
 
+# look at final modelled margins versus naive poll average
+p_obama %>% 
+  filter(t==max(t),state %in% ex_states) %>% 
+  mutate(full_model = mean) %>%
+  select(state,full_model) %>%
+  left_join(df %>% filter(t > ymd('2012-10-14')) %>%
+              group_by(state) %>%
+              summarise(poll = weighted.mean(p_obama,n_respondents)))  %>%
+  mutate(diff = full_model - poll) 
 
