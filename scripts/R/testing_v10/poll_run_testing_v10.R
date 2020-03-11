@@ -342,16 +342,20 @@ init_ll <- lapply(1:n_chains, function(id) initf2(chain_id = id))
 
 ### Run ----
 
+# save all models in vector
 models_to_run <- list.files("scripts/Stan/Testing_refactored_v10")
 n_of_models <- length(models_to_run)
 list_output <- list()
 
 for (i_model in 1:6){
   
+  # create list in list
   list_output[[i]] <- list()
+  # save model name
   list_output[[i]][["model_name"]] <- models_to_run[i]
   
   # read model code
+  # access models individually
   model <- rstan::stan_model(paste0("scripts/Stan/Testing_refactored_v10/", models_to_run[i_model]))
   
   # run model
