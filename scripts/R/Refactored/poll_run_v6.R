@@ -123,7 +123,7 @@ state_correlation_error <- cov_matrix(51, 0.1^2, .8) # 0.08^2
 state_correlation_error <- state_correlation_error * state_correlation
 
 #state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
-state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 1/20, rho = 0.5) #1/20
+state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.09, rho = 0.5) #1/20
 state_correlation_mu_b_T <- state_correlation_mu_b_T * state_correlation
 
 # state_correlation_mu_b_walk <- state_correlation
@@ -244,6 +244,21 @@ score_among_polled <- sum(states2012[all_polled_states[-1],]$obama_count)/
         states2012[all_polled_states[-1],]$romney_count)
 
 alpha_prior <- log(states2012$national_score[1]/score_among_polled)
+
+
+y <- mvrnorm(1000, mu_b_prior, Sigma = state_correlation_mu_b_T)
+
+inv.logit(apply(y, MARGIN = 2, mean))
+
+inv.logit(apply(y, MARGIN = 2, mean) + 1.96 * apply(y, MARGIN = 2, sd))
+
+inv.logit(apply(y, MARGIN = 2, mean) - 1.96 * apply(y, MARGIN = 2, sd)) #for 95% CI
+
+cbind(
+  inv.logit(apply(y, MARGIN = 2, mean)),
+  inv.logit(apply(y, MARGIN = 2, mean) + 1.96 * apply(y, MARGIN = 2, sd)), 
+  inv.logit(apply(y, MARGIN = 2, mean) - 1.96 * apply(y, MARGIN = 2, sd)))
+
 
 # First stage predictions -------
 N <- nrow(df)

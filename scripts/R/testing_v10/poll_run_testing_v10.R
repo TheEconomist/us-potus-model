@@ -123,7 +123,7 @@ state_correlation_error <- cov_matrix(51, 0.1^2, .8) # 0.08^2
 state_correlation_error <- state_correlation_error * state_correlation
 
 #state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
-state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 1/20, rho = 0.5) #1/20
+state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.072, rho = 0.5) #1/20
 state_correlation_mu_b_T <- state_correlation_mu_b_T * state_correlation
 
 # state_correlation_mu_b_walk <- state_correlation
@@ -346,10 +346,10 @@ models_to_run <- list.files("scripts/Stan/Testing_refactored_v10")
 n_of_models <- length(models_to_run)
 list_output <- list()
 
-for (i_model in 1:6){
+for (i_model in 2:n_of_models){
   
-  list_output[[i]] <- list()
-  list_output[[i]][["model_name"]] <- models_to_run[i]
+  list_output[[i_model]] <- list()
+  list_output[[i_model]][["model_name"]] <- models_to_run[i_model]
   
   # read model code
   model <- rstan::stan_model(paste0("scripts/Stan/Testing_refactored_v10/", models_to_run[i_model]))
@@ -362,13 +362,13 @@ for (i_model in 1:6){
   
   
   # save model for today
-  write_rds(out, paste0(models_to_run[i], "_", sprintf('stan_model_%s.rds',RUN_DATE)),compress = 'gz')
+  write_rds(out, paste0(models_to_run[i_model], "_", sprintf('stan_model_%s.rds',RUN_DATE)),compress = 'gz')
   
   ### Extract results ----
   #out <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
   
   # etc
-  #list_output[[i]][["a"]] <- rstan::extract(out, pars = "alpha")[[1]]
+  #list_output[[i_model]][["a"]] <- rstan::extract(out, pars = "alpha")[[1]]
 
   # delta
   delta <- rstan::extract(out, pars = "delta")[[1]]
@@ -495,7 +495,7 @@ for (i_model in 1:6){
                                      c(2,2,3,3,3)),
                top = identifier
   )
-  list_output[[i]][["plt_joint"]] <- plt_joint
+  list_output[[i_model]][["plt_joint"]] <- plt_joint
   
   # probs v other forecasters
   v_others <- ggplot(sim_evs, aes(x=t)) +
@@ -512,7 +512,7 @@ for (i_model in 1:6){
                            prob = c(0.85,0.71,0.98,0.89,0.99,0.92,0.84)),
                aes(yintercept=prob,col=forecaster),linetype=2) +
     labs(subtitle = identifier)
-  list_output[[i]][["v_others"]] <- v_others
+  list_output[[i_model]][["v_others"]] <- v_others
   
   # now-cast probability over time all states
   p_clinton_all <- p_clinton %>%
@@ -531,7 +531,7 @@ for (i_model in 1:6){
     scale_y_continuous(breaks=seq(0,1,0.1)) +
     labs(subtitle = identifier)
   
-  list_output[[i]][["p_clinton_all"]] <- p_clinton_all
+  list_output[[i_model]][["p_clinton_all"]] <- p_clinton_all
   
   # diff from national over time?
   p_clinton_diff <- p_clinton[p_clinton$state != '--',] %>%
@@ -554,7 +554,7 @@ for (i_model in 1:6){
     scale_y_continuous(breaks=seq(-1,1,0.01)) +
     labs(subtitle = identifier)
 
-  list_output[[i]][["p_clinton_diff"]] <- p_clinton_diff
+  list_output[[i_model]][["p_clinton_diff"]] <- p_clinton_diff
  
   
   # final EV distribution
@@ -575,7 +575,7 @@ for (i_model in 1:6){
     labs(x='Democratic electoral college votes',
          subtitle=sprintf("p(dem win) = %s",mean(final_evs$dem_ev>=270)))
 
-  list_output[[i]][["final_evs"]] <- final_evs
+  list_output[[i_model]][["final_evs"]] <- final_evs
 
    
   # brier scores
@@ -588,7 +588,7 @@ for (i_model in 1:6){
     mutate(ev_weight = ev/(sum(ev))) 
   
   
-  tibble(outlet = c('538 polls-plus','538 polls-only','princeton','nyt upshot','kremp/slate','pollsavvy','predictwise markets','predictwise overall','desart and holbrook','daily kos','huffpost'),
+  briers <- tibble(outlet = c('538 polls-plus','538 polls-only','princeton','nyt upshot','kremp/slate','pollsavvy','predictwise markets','predictwise overall','desart and holbrook','daily kos','huffpost'),
          ev_wtd_brier = c(0.0928,0.0936,0.1169,0.1208,0.121,0.1219,0.1272,0.1276,0.1279,0.1439,0.1505),
          unwtd_brier = c(0.0664,0.0672,0.0744,0.0801,0.0766,0.0794,0.0767,0.0783,0.0825,0.0864,0.0892),
          states_correct = c(46,46,47,46,46,46,46,46,44,46,46)) %>% 
@@ -598,8 +598,16 @@ for (i_model in 1:6){
                      states_correct=sum(round(compare$clinton_win) == round(compare$clinton_win_actual)))) %>%
     arrange(ev_wtd_brier) 
   
+  list_output[[i_model]][["briers"]] <- briers
+  
+  
 }
 
 write_rds(list_output, sprintf('model_tests_%s.rds',RUN_DATE),compress = 'gz')
+
+
+
+
+list_output
 
   
