@@ -348,6 +348,9 @@ list_output <- list()
 
 for (i_model in 1:6){
   
+  list_output[[i]] <- list()
+  list_output[[i]][["model_name"]] <- models_to_run[i]
+  
   # read model code
   model <- rstan::stan_model(paste0("scripts/Stan/Testing_refactored_v10/", models_to_run[i_model]))
   
@@ -359,17 +362,17 @@ for (i_model in 1:6){
   
   
   # save model for today
-  write_rds(out, sprintf('stan_model_%s.rds',RUN_DATE),compress = 'gz')
+  write_rds(out, paste0(models_to_run[i], "_", sprintf('stan_model_%s.rds',RUN_DATE)),compress = 'gz')
   
   ### Extract results ----
   #out <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
   
   # etc
-  a <- rstan::extract(out, pars = "alpha")[[1]]
-  hist(a)
+  #list_output[[i]][["a"]] <- rstan::extract(out, pars = "alpha")[[1]]
+
   # delta
   delta <- rstan::extract(out, pars = "delta")[[1]]
-  hist(delta)
+  #hist(delta)
   # extract predictions
   predicted_score <- rstan::extract(out, pars = "predicted_score")[[1]]
   
@@ -487,15 +490,15 @@ for (i_model in 1:6){
     scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b') +
     labs(subtitle='p_clinton state')
   
-  grid.arrange(natl_polls.gg, natl_evs.gg, state_polls.gg, 
+  plt_joint <- grid.arrange(natl_polls.gg, natl_evs.gg, state_polls.gg, 
                layout_matrix = rbind(c(1,1,3,3,3),
                                      c(2,2,3,3,3)),
                top = identifier
   )
-  
+  list_output[[i]][["plt_joint"]] <- plt_joint
   
   # probs v other forecasters
-  ggplot(sim_evs, aes(x=t)) +
+  v_others <- ggplot(sim_evs, aes(x=t)) +
     geom_hline(yintercept = 0.5) +
     geom_line(aes(y=prob))  +
     coord_cartesian(ylim=c(0,1)) +
@@ -509,11 +512,10 @@ for (i_model in 1:6){
                            prob = c(0.85,0.71,0.98,0.89,0.99,0.92,0.84)),
                aes(yintercept=prob,col=forecaster),linetype=2) +
     labs(subtitle = identifier)
-  
-  
+  list_output[[i]][["v_others"]] <- v_others
   
   # now-cast probability over time all states
-  p_clinton %>%
+  p_clinton_all <- p_clinton %>%
     #filter(abs(mean-0.5)<0.2) %>%
     # plot
     ggplot(.,aes(x=t,y=prob,col=state)) +
@@ -529,8 +531,10 @@ for (i_model in 1:6){
     scale_y_continuous(breaks=seq(0,1,0.1)) +
     labs(subtitle = identifier)
   
+  list_output[[i]][["p_clinton_all"]] <- p_clinton_all
+  
   # diff from national over time?
-  p_clinton[p_clinton$state != '--',] %>%
+  p_clinton_diff <- p_clinton[p_clinton$state != '--',] %>%
     left_join(p_clinton[p_clinton$state=='--',] %>%
                 select(t,p_clinton_national=mean), by='t') %>%
     mutate(diff=mean-p_clinton_national) %>%
@@ -549,7 +553,9 @@ for (i_model in 1:6){
     scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b') +
     scale_y_continuous(breaks=seq(-1,1,0.01)) +
     labs(subtitle = identifier)
-  
+
+  list_output[[i]][["p_clinton_diff"]] <- p_clinton_diff
+ 
   
   # final EV distribution
   final_evs <- draws %>%
@@ -558,7 +564,7 @@ for (i_model in 1:6){
     group_by(draw) %>%
     summarise(dem_ev = sum(ev* (p_clinton > 0.5)))
   
-  ggplot(final_evs,aes(x=dem_ev,
+  final_evs <- ggplot(final_evs,aes(x=dem_ev,
                        fill=ifelse(dem_ev>=270,'Democratic','Republican'))) +
     geom_vline(xintercept = 270) +
     geom_histogram(binwidth=1) +
@@ -568,7 +574,10 @@ for (i_model in 1:6){
     scale_fill_manual(name='Electoral College winner',values=c('Democratic'='#3A4EB1','Republican'='#E40A04')) +
     labs(x='Democratic electoral college votes',
          subtitle=sprintf("p(dem win) = %s",mean(final_evs$dem_ev>=270)))
-  
+
+  list_output[[i]][["final_evs"]] <- final_evs
+
+   
   # brier scores
   # https://www.buzzfeednews.com/article/jsvine/2016-election-forecast-grades
   compare <- p_clinton %>% 
@@ -591,3 +600,6 @@ for (i_model in 1:6){
   
 }
 
+write_rds(list_output, sprintf('model_tests_%s.rds',RUN_DATE),compress = 'gz')
+
+  
