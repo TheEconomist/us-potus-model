@@ -446,6 +446,14 @@ sim_evs <- draws %>%
             low_dem_ev = quantile(dem_ev,0.025),
             prob = mean(dem_ev >= 270))
 
+# draws %>%
+#   left_join(states2012 %>% select(state,ev),by='state') %>%
+#   group_by(t,draw) %>%
+#   filter(draw<500) %>%
+#   summarise(dem_ev = sum(ev * (p_clinton > 0.5))) %>%
+#   group_by(t) %>%
+#   spread(draw,dem_ev) %>%
+#   write_csv(.,'~/Desktop/500_sims_per_day.csv')
 
 # add identifier
 identifier <- paste0(Sys.Date()," || " , out@model_name)

@@ -116,15 +116,15 @@ polls_2008 <- polls_2008 %>%
 state_correlation <- cor(polls_2008)  
 
 #state_correlation_error <- state_correlation # covariance for backward walk
-state_correlation_error <- cov_matrix(51, 0.1^2, .8) # 0.08^2
+state_correlation_error <- cov_matrix(51, 0.1^2, .9) # 0.08^2
 state_correlation_error <- state_correlation_error * state_correlation
 
 #state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
-state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.09, rho = 0.5) #1/20
+state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.09, rho = 0.8) #1/20
 state_correlation_mu_b_T <- state_correlation_mu_b_T * state_correlation
 
 # state_correlation_mu_b_walk <- state_correlation
-state_correlation_mu_b_walk <- cov_matrix(51, (0.015)^2, 0.75) #(0.015)^2
+state_correlation_mu_b_walk <- cov_matrix(51, (0.015)^2, 0.8) #(0.015)^2
 state_correlation_mu_b_walk <- state_correlation_mu_b_walk * state_correlation
 
 # Numerical indices passed to Stan for states, days, weeks, pollsters
@@ -218,8 +218,7 @@ best_result = prior_model$results[best, ]
 rownames(best_result) = NULL
 best_result
 # make predictions
-national_mu_prior <- predict(prior_model,newdata = tibble(q2gdp = 1.3,
-                                                          juneapp = 1))
+national_mu_prior <- predict(prior_model,newdata = tibble(q2gdp = 1.3, juneapp = 1))
 #national_mu_prior <- 51.1
 cat(sprintf('Prior Obama two-party vote is %s\nWith a standard error of %s',
             round(national_mu_prior/100,3),round(best_result$RMSE/100,3)))
@@ -343,7 +342,7 @@ init_ll <- lapply(1:n_chains, function(id) initf2(chain_id = id))
 
 # read model code
 #model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v10.stan")
-model <- rstan::stan_model("scripts/Stan/Testing_refactored_v10/poll_model_no_state_to_national.stan")
+model <- rstan::stan_model("scripts/Stan/Testing_refactored_v10/poll_model_no_measurement_error.stan")
 
 
 # run model
@@ -357,7 +356,7 @@ out <- rstan::sampling(model, data = data,
 write_rds(out, sprintf('models/backtest_2012/stan_model_%s.rds',RUN_DATE),compress = 'gz')
 
 ### Extract results ----
-out  <- read_rds(sprintf('models/backtest_2012/stan_model_%s.rds',RUN_DATE))
+#out  <- read_rds(sprintf('models/backtest_2012/stan_model_%s.rds',RUN_DATE))
 
 # etc
 a <- rstan::extract(out, pars = "alpha")[[1]]
@@ -389,7 +388,7 @@ p_obama <- p_obama %>%
   mutate(t = row_number() + min(df$begin)) %>%
   ungroup()
 
-ex_states <- c('IA','FL','OH','WI','MI','PA','VA','NC','NH')
+ex_states <- c('IA','FL','OH','WI','CO','PA','VA','NC','NH')
 
 # together
 # national vote = vote * state weights
