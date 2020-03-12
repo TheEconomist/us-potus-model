@@ -48,8 +48,6 @@ start_date <- as.Date("2012-03-01") # Keeping all polls after March 1, 2016
 #setwd(here("data/"))
 all_polls <- read_csv('data/all_polls_2012.csv')
 
-all_polls <- bind_rows(all_polls,all_polls,all_polls)
-
 # select relevant columns from HufFPost polls
 all_polls <- all_polls %>%
   dplyr::select(state, pollster, number.of.observations, mode,population,
@@ -144,7 +142,7 @@ T <- as.integer(round(difftime(election_day, min(df$start.date))))
 # selections
 df <- df %>%
   arrange(state, t, polltype, two_party_sum) %>% 
-  #distinct(state, t, pollster, .keep_all = TRUE) %>%
+  distinct(state, t, pollster, .keep_all = TRUE) %>%
   select(
     # poll information
     state, t, begin, end, pollster, polltype, method = mode, n_respondents, 
@@ -227,7 +225,8 @@ cat(sprintf('Prior Obama two-party vote is %s\nWith a standard error of %s',
             round(national_mu_prior/100,3),round(best_result$RMSE/100,3)))
 # on correct scale
 national_mu_prior <- national_mu_prior / 100
-national_sigma_prior <- best_result$RMSE / 100
+
+
 # Mean of the mu_b_prior
 # 0.486 is the predicted Clinton share of the national vote according to the Lewis-Beck & Tien model
 # https://pollyvote.com/en/components/econometric-models/lewis-beck-tien/
