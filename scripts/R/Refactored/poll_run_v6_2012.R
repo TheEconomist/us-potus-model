@@ -48,6 +48,8 @@ start_date <- as.Date("2012-03-01") # Keeping all polls after March 1, 2016
 #setwd(here("data/"))
 all_polls <- read_csv('data/all_polls_2012.csv')
 
+all_polls <- bind_rows(all_polls,all_polls,all_polls)
+
 # select relevant columns from HufFPost polls
 all_polls <- all_polls %>%
   dplyr::select(state, pollster, number.of.observations, mode,population,
@@ -116,15 +118,16 @@ polls_2008 <- polls_2008 %>%
 state_correlation <- cor(polls_2008)  
 
 #state_correlation_error <- state_correlation # covariance for backward walk
-state_correlation_error <- cov_matrix(51, 0.1^2, .9) # 0.08^2
+state_correlation_error <- cov_matrix(51, 0.1^2, .8) # 0.08^2
 state_correlation_error <- state_correlation_error * state_correlation
 
 #state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
-state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.09, rho = 0.8) #1/20
+state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.09, rho = 0.5) #1/20
 state_correlation_mu_b_T <- state_correlation_mu_b_T * state_correlation
 
 # state_correlation_mu_b_walk <- state_correlation
-state_correlation_mu_b_walk <- cov_matrix(51, (0.015)^2, 0.8) #(0.015)^2
+variance <- ((0.015)^2) / 7
+state_correlation_mu_b_walk <- cov_matrix(51, variance, 0.75) #(0.015)^2
 state_correlation_mu_b_walk <- state_correlation_mu_b_walk * state_correlation
 
 # Numerical indices passed to Stan for states, days, weeks, pollsters
@@ -141,7 +144,7 @@ T <- as.integer(round(difftime(election_day, min(df$start.date))))
 # selections
 df <- df %>%
   arrange(state, t, polltype, two_party_sum) %>% 
-  distinct(state, t, pollster, .keep_all = TRUE) %>%
+  #distinct(state, t, pollster, .keep_all = TRUE) %>%
   select(
     # poll information
     state, t, begin, end, pollster, polltype, method = mode, n_respondents, 
@@ -262,6 +265,7 @@ m_1st <- rstan::stan_model("scripts/Stan/Refactored/poll_model_1st_stage_v1.stan
 # run
 out <- rstan::sampling(m_1st, data = data_1st, iter = 1000,warmup=500, chains = 2)
 # extract
+mean(as.integer(apply(rstan::extract(out, pars = "yrep")[[1]], MARGIN = 2, sd)))
 yrep_two_share <- as.integer(apply(rstan::extract(out, pars = "yrep")[[1]], MARGIN = 2, median))
 # Passing the data to Stan and running the model ---------
 N <- nrow(df)
@@ -280,7 +284,7 @@ pred_two_share <- yrep_two_share/df$n_respondents
 # priors ---
 prior_sigma_measure_noise <- 0.01 ### 0.1 / 2
 prior_sigma_a <- 0.03 ### 0.05 / 2
-prior_sigma_b <- 0.04 ### 0.05 / 2
+prior_sigma_b <- 0.04 ### 0.05 / 2 # 8%
 mu_b_prior <- mu_b_prior
 prior_sigma_c <- 0.02 ### 0.1 / 2
 mu_alpha <- alpha_prior
@@ -342,7 +346,7 @@ init_ll <- lapply(1:n_chains, function(id) initf2(chain_id = id))
 
 # read model code
 #model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v10.stan")
-model <- rstan::stan_model("scripts/Stan/Testing_refactored_v10/poll_model_no_measurement_error.stan")
+model <- rstan::stan_model("scripts/Stan/Testing_refactored_v10/poll_model_no_state_to_national.stan")
 
 
 # run model
@@ -356,7 +360,7 @@ out <- rstan::sampling(model, data = data,
 write_rds(out, sprintf('models/backtest_2012/stan_model_%s.rds',RUN_DATE),compress = 'gz')
 
 ### Extract results ----
-#out  <- read_rds(sprintf('models/backtest_2012/stan_model_%s.rds',RUN_DATE))
+out  <- read_rds(sprintf('models/backtest_2012/stan_model_%s.rds',RUN_DATE))
 
 # etc
 a <- rstan::extract(out, pars = "alpha")[[1]]

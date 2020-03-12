@@ -127,7 +127,8 @@ state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.09, rho = 0.5) #1/20
 state_correlation_mu_b_T <- state_correlation_mu_b_T * state_correlation
 
 # state_correlation_mu_b_walk <- state_correlation
-state_correlation_mu_b_walk <- cov_matrix(51, (0.015)^2, 0.75) #(0.015)^2
+
+state_correlation_mu_b_walk <- cov_matrix(51, ((0.015)^2) / 7, 0.75) 
 state_correlation_mu_b_walk <- state_correlation_mu_b_walk * state_correlation
 
 # Numerical indices passed to Stan for states, days, weeks, pollsters
@@ -355,7 +356,8 @@ init_ll <- lapply(1:n_chains, function(id) initf2(chain_id = id))
 #setwd(here("scripts/Stan/Refactored/"))
 
 # read model code
-model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v10.stan")
+# model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v10.stan")
+model <- rstan::stan_model("scripts/Stan/Testing_refactored_v10/poll_model_no_state_to_national.stan")
 
 # run model
 out <- rstan::sampling(model, data = data,
