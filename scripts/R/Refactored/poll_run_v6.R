@@ -127,7 +127,6 @@ state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.09, rho = 0.5) #1/20
 state_correlation_mu_b_T <- state_correlation_mu_b_T * state_correlation
 
 # state_correlation_mu_b_walk <- state_correlation
-
 state_correlation_mu_b_walk <- cov_matrix(51, ((0.015)^2) / 7, 0.75) 
 state_correlation_mu_b_walk <- state_correlation_mu_b_walk * state_correlation
 
@@ -208,32 +207,35 @@ names(ev_state) <- states2012$state
 #setwd(here("data/"))
 abramowitz <- read.csv('data/abramowitz_data.csv') %>% filter(year != 2016)
 
-# train a caret model to predict demvote with incvote ~ q2gdp + juneapp + year:q2gdp + year:juneapp 
+# train a caret model to predict demvote 
 prior_model <- caret::train(
-  incvote ~ q2gdp + juneapp , #+ year:q2gdp + year:juneapp
+  incvote ~  juneapp , #+ year:q2gdp + year:juneapp
   data = abramowitz,
   #method = "glmnet",
   trControl = trainControl(
     method = "LOOCV"),
   tuneLength = 50)
+
 # find the optimal parameters
 best = which(rownames(prior_model$results) == rownames(prior_model$bestTune))
 best_result = prior_model$results[best, ]
 rownames(best_result) = NULL
 best_result
+
 # make predictions
 national_mu_prior <- predict(prior_model,newdata = tibble(q2gdp = 1.1,
                                                           juneapp = 4,
                                                           year = 2016))
 cat(sprintf('Prior Clinton two-party vote is %s\nWith a standard error of %s',
             round(national_mu_prior/100,3),round(best_result$RMSE/100,3)))
+
 # on correct scale
 national_mu_prior <- national_mu_prior / 100
 national_sigma_prior <- best_result$RMSE / 100
+
 # Mean of the mu_b_prior
 # 0.486 is the predicted Clinton share of the national vote according to the Lewis-Beck & Tien model
 # https://pollyvote.com/en/components/econometric-models/lewis-beck-tien/
-mu_b_prior <- logit(national_mu_prior + c("--" = 0, prior_diff_score))
 mu_b_prior <- logit(national_mu_prior + prior_diff_score)
 
 # The model uses national polls to complement state polls when estimating the national term mu_a.
@@ -278,6 +280,7 @@ m_1st <- rstan::stan_model("scripts/Stan/Refactored/poll_model_1st_stage_v1.stan
 out <- rstan::sampling(m_1st, data = data_1st, iter = 1000,warmup=500, chains = 2)
 # extract
 yrep_two_share <- as.integer(apply(rstan::extract(out, pars = "yrep")[[1]], MARGIN = 2, median))
+
 # Passing the data to Stan and running the model ---------
 N <- nrow(df)
 T <- T
@@ -301,6 +304,7 @@ prior_sigma_c <- 0.02 ### 0.1 / 2
 mu_alpha <- alpha_prior
 sigma_alpha <- 0.2  ### 0.2
 prior_delta_sigma <- 0.1 ### guess
+
 # data ---
 data <- list(
   N = N,
@@ -525,7 +529,6 @@ ggplot(sim_evs, aes(x=t)) +
                          prob = c(0.85,0.71,0.98,0.89,0.99,0.92,0.84)),
              aes(yintercept=prob,col=forecaster),linetype=2) +
   labs(subtitle = identifier)
-
 
 
 # now-cast probability over time all states

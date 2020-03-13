@@ -34,10 +34,13 @@ results <- results %>%
   ungroup()
 
 # get dem predictions for that year
-abramowitz <- read.csv('data/abramowitz_data.csv') 
+abramowitz <- read.csv('data/abramowitz_data.csv') %>% 
+  left_join(read_csv('data/ANES_swing_voters.csv')) %>%
+  filter(!is.na(ANES_share_swing_voters))
 
 # train a caret model to predict demvote with incvote ~ q2gdp + juneapp + year:q2gdp + year:juneapp 
-prior_model <- lm(incvote ~ q2gdp + juneapp , #+ year:q2gdp + year:juneapp
+prior_model <- lm(incvote ~ 
+                    juneapp*ANES_share_swing_voters, 
                   data = abramowitz)
 
 national_preds = tibble(year = abramowitz$year,
@@ -49,9 +52,7 @@ results <- results %>%
   mutate(dem_share_vote_year_prediction = dem_two_party_share_lean_lag + pred_two_party_national,
   )
 
-
 rmse(results$dem_share_vote_year_prediction  -  results$dem_two_party_share)
-
 
 
 
