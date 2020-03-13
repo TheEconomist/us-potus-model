@@ -11,11 +11,11 @@ data{
   int<lower = 1, upper = P> poll_national[N_national];  // Pollster index
   // data
   int n_democrat_national[N_national];
-  int n_respondents_national[N_national];
   int n_two_share_national[N_national];
+  vector[N_national] pred_two_share_national;
   int n_democrat_state[N_state];
-  int n_respondents_state[N_state];
   int n_two_share_state[N_state];
+  vector[N_state] pred_two_share_state;
   // forward-backward
   int<lower = 1, upper = T> current_T;
   matrix[S, S] ss_corr_mu_b_walk;
@@ -89,8 +89,8 @@ transformed parameters {
   // delta
   real delta;
   //*** containers
-  real logit_pi_democrat_state[N_state];
-  real logit_pi_democrat_national[N_national];
+  vector[N_state] logit_pi_democrat_state;
+  vector[N_national] logit_pi_democrat_national;
   //*** construct parameters
   // alpha
   alpha = mu_alpha + raw_alpha * sigma_alpha;
@@ -119,25 +119,13 @@ transformed parameters {
   //*** fill pi_democrat
   // state
   for (i in 1:N_state){
-    logit_pi_democrat_state[i] = mu_a[day[i]] + mu_b[state[i], day[i]] + mu_c[poll[i]] + 
-      measure_noise[i] * sigma_measure_noise_state + polling_error[state[i]] + delta * pred_two_share[i];
+    logit_pi_democrat_state[i] = mu_a[day_state[i]] + mu_b[state[i], day_state[i]] + mu_c[poll_state[i]] + 
+      measure_noise_state[i] * sigma_measure_noise_state + polling_error[state[i]] + delta * pred_two_share_state[i];
   }
   // national
-  logit_pi_democrat_national = mu_a[day_national] + alpha + mu_c[poll_national] + sigma_measure_noise_state * measure_noise_national + delta * pred_two_share_national;
-    // national-level
-    if (state[i] == 52){
-      // sum_average_states = weights times state polls trends
-      // alpha              = discrepancy adjustment
-      // mu_c               = polling house effect
-      // measure_noise      = noise of the individual poll
-      pi_democrat[i] = mu_a[day[i]] + alpha + mu_c[poll[i]] + 
-        sigma_measure_noise_national * measure_noise[i] + delta * pred_two_share[i];
-    } else {
-
-    }
-  }
+  logit_pi_democrat_national = mu_a[day_national] + alpha + mu_c[poll_national] + 
+      measure_noise_national * sigma_measure_noise_state + delta * pred_two_share_national;
 }
-
 model {
   //*** priors
   // alpha
@@ -155,13 +143,15 @@ model {
   // measurement noise
   raw_sigma_measure_noise_state ~ std_normal();
   raw_sigma_measure_noise_national ~ std_normal();
-  measure_noise ~ std_normal();
+  measure_noise_national ~ std_normal();
+  measure_noise_state ~ std_normal();
   // raw_polling_error
   raw_polling_error ~ std_normal();
   // raw_delta
   raw_delta ~ std_normal();
   //*** likelihood
-  n_democrat ~ binomial_logit(n_respondents, pi_democrat);
+  n_democrat_state ~ binomial_logit(n_two_share_state, logit_pi_democrat_state);
+  n_democrat_national ~ binomial_logit(n_two_share_national, logit_pi_democrat_national);
 }
 
 generated quantities {

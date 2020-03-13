@@ -1,21 +1,16 @@
 data{
-  int N_national;    // Number of polls
-  int N_state;    // Number of polls
+  int N;    // Number of polls
   int T;    // Number of days
   int S;    // Number of states (for which at least 1 poll is available) + 1
   int P;    // Number of pollsters
-  int<lower = 1, upper = S + 1> state[N_state]; // State index
-  int<lower = 1, upper = T> day_state[N_state];   // Day index
-  int<lower = 1, upper = T> day_national[N_national];   // Day index
-  int<lower = 1, upper = P> poll_state[N_state];  // Pollster index
-  int<lower = 1, upper = P> poll_national[N_national];  // Pollster index
+  int<lower = 1, upper = S + 1> state[N]; // State index
+  int<lower = 1, upper = T> day[N];   // Day index
+  int<lower = 1, upper = P> poll[N];  // Pollster index
+  vector[S] state_weights; //
   // data
-  int n_democrat_national[N_national];
-  int n_respondents_national[N_national];
-  int n_two_share_national[N_national];
-  int n_democrat_state[N_state];
-  int n_respondents_state[N_state];
-  int n_two_share_state[N_state];
+  int n_democrat[N];
+  int n_respondents[N];
+  real pred_two_share[N];
   // forward-backward
   int<lower = 1, upper = T> current_T;
   matrix[S, S] ss_corr_mu_b_walk;
@@ -38,6 +33,7 @@ data{
   real prior_delta_sigma;
 }
 transformed data {
+  row_vector[S] rv_state_weights;
   matrix[S, S] cholesky_ss_corr_mu_b_T;
   matrix[S, S] cholesky_ss_corr_mu_b_walk;
   matrix[S, S] cholesky_ss_corr_error;
@@ -50,31 +46,33 @@ parameters {
   real raw_alpha;             
   // mu_a
   real<lower = 0> raw_sigma_a;
-  real raw_mu_a[current_T];
+  real raw_mu_adj[current_T];
+  real raw_mu_unadj[current_T];
   // mu_b
   real<lower = 0> raw_sigma_b;
   vector[S] raw_mu_b_T;
-  matrix[S, T] raw_mu_b; 
+  matrix[S, T] raw_mu_b; // S state-specific components at time T
   // mu_c
   real<lower = 0> raw_sigma_c;
   vector[P] raw_mu_c;
   // u = measurement noise
   real <lower = 0> raw_sigma_measure_noise_state;
   real <lower = 0> raw_sigma_measure_noise_national;
-  vector[N_national] measure_noise_national;
-  vector[N_state] measure_noise_state;
+  vector[N] measure_noise;
   // e polling error
-  vector[S] raw_polling_error; 
+  vector[S] raw_polling_error;  // S state-specific polling errors (raw)
   // delta
   real raw_delta;
 }
+
 transformed parameters {
   //*** parameters
   // alpha
-  real sigma_a;
   real alpha;
   // mu_a
-  vector[current_T] mu_a;
+  real sigma_a;
+  vector[current_T] mu_a_adj;
+  vector[current_T] mu_a_unadj;
   // mu_b
   real sigma_b;
   matrix[S, T] mu_b;
@@ -89,8 +87,7 @@ transformed parameters {
   // delta
   real delta;
   //*** containers
-  real logit_pi_democrat_state[N_state];
-  real logit_pi_democrat_national[N_national];
+  real pi_democrat[N];
   //*** construct parameters
   // alpha
   alpha = mu_alpha + raw_alpha * sigma_alpha;
@@ -98,8 +95,10 @@ transformed parameters {
   polling_error = cholesky_ss_corr_error * raw_polling_error; // cholesky decomposition
   // mu_a
   sigma_a = raw_sigma_a * prior_sigma_a;
-  mu_a[current_T] = 0;
-  for (t in 1:(current_T - 1)) mu_a[current_T - t] = mu_a[current_T - t + 1] + raw_mu_a[current_T - t + 1] * sigma_a; 
+  mu_a_adj[current_T] = 0;
+  mu_a_unadj[current_T] = 0;
+  for (t in 1:(current_T - 1)) mu_a_adj[current_T - t] = mu_a_adj[current_T - t + 1] + raw_mu_a_adj[current_T - t + 1] * sigma_a; 
+  for (t in 1:(current_T - 1)) mu_a_unadj[current_T - t] = mu_a_unadj[current_T - t + 1] + raw_mu_a_unadj[current_T - t + 1] * sigma_a; 
   // mu_b
   sigma_b = raw_sigma_b * prior_sigma_b;
     // last (T)
@@ -117,13 +116,7 @@ transformed parameters {
   // delta
   delta = raw_delta * prior_delta_sigma;
   //*** fill pi_democrat
-  // state
-  for (i in 1:N_state){
-    logit_pi_democrat_state[i] = mu_a[day[i]] + mu_b[state[i], day[i]] + mu_c[poll[i]] + 
-      measure_noise[i] * sigma_measure_noise_state + polling_error[state[i]] + delta * pred_two_share[i];
-  }
-  // national
-  logit_pi_democrat_national = mu_a[day_national] + alpha + mu_c[poll_national] + sigma_measure_noise_state * measure_noise_national + delta * pred_two_share_national;
+  for (i in 1:N){
     // national-level
     if (state[i] == 52){
       // sum_average_states = weights times state polls trends
@@ -133,7 +126,14 @@ transformed parameters {
       pi_democrat[i] = mu_a[day[i]] + alpha + mu_c[poll[i]] + 
         sigma_measure_noise_national * measure_noise[i] + delta * pred_two_share[i];
     } else {
-
+      // state-level
+      // mu_a               = national component
+      // mu_b               = state component
+      // mu_c               = poll component
+      // measure_noise (u)  = state noise
+      // polling_error (e)  = polling error term (state specific)
+      pi_democrat[i] = mu_a[day[i]] + mu_b[state[i], day[i]] + mu_c[poll[i]] + 
+        measure_noise[i] * sigma_measure_noise_state + polling_error[state[i]] + delta * pred_two_share[i];
     }
   }
 }
