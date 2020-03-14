@@ -105,8 +105,6 @@ df <- df %>%
          p_other = other/100)
 
 
-
-
 # prepare stan date -----------------------------------------------------------
 
 # create correlation matrix ---------------------------------------------
@@ -115,20 +113,25 @@ df <- df %>%
 polls_2012 <- read.csv("data/potus_results_76_16.csv")
 polls_2012 <- polls_2012 %>% 
   select(year, state, dem) %>%
-  spread(state, dem) %>% select(-year)
+  group_by(state) %>%
+  mutate(dem = dem - lag(dem)) %>%
+  spread(state, dem) %>% 
+  na.omit() %>%
+  select(-year)
 state_correlation <- cor(polls_2012)  
+state_correlation <- make.positive.definite(state_correlation)
 
 #state_correlation_error <- state_correlation # covariance for backward walk
-state_correlation_error <- cov_matrix(51, 0.1^2, .8) # 0.08^2
-state_correlation_error <- state_correlation_error * state_correlation
+#state_correlation_error <- cov_matrix(51, 0.08^2, .8) # 0.08^2
+state_correlation_error <- 0.08^2 * state_correlation
 
 #state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
-state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.09, rho = 0.5) #1/20
-state_correlation_mu_b_T <- state_correlation_mu_b_T * state_correlation
+#state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.09, rho = 0.5) #1/20
+state_correlation_mu_b_T <- 0.09 * state_correlation
 
 # state_correlation_mu_b_walk <- state_correlation
-state_correlation_mu_b_walk <- cov_matrix(51, ((0.015)^2) / 7, 0.75) 
-state_correlation_mu_b_walk <- state_correlation_mu_b_walk * state_correlation
+#state_correlation_mu_b_walk <- cov_matrix(51, ((0.015)^2) / 7, 0.75) 
+state_correlation_mu_b_walk <- ((0.015)^2) / 7 * state_correlation
 
 # Numerical indices passed to Stan for states, days, weeks, pollsters
 df <- df %>% 
@@ -251,10 +254,7 @@ alpha_prior <- log(states2012$national_score[1]/score_among_polled)
 
 y <- MASS::mvrnorm(1000, mu_b_prior, Sigma = state_correlation_error)
 
-cbind(
-  inv.logit(apply(y, MARGIN = 2, mean)),
-  inv.logit(apply(y, MARGIN = 2, mean) + 1.96 * apply(y, MARGIN = 2, sd)), 
-  inv.logit(apply(y, MARGIN = 2, mean) - 1.96 * apply(y, MARGIN = 2, sd)))
+mean( inv.logit(apply(y, MARGIN = 2, mean)  + apply(y, MARGIN = 2, sd)) - inv.logit(apply(y, MARGIN = 2, mean)) )
 
 
 # First stage predictions -------
@@ -374,7 +374,6 @@ init_ll <- lapply(1:n_chains, function(id) initf2(chain_id = id))
 #setwd(here("scripts/Stan/Refactored/"))
 
 # read model code
-# model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v10.stan")
 model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v12.stan")
 
 # run model
@@ -388,14 +387,32 @@ out <- rstan::sampling(model, data = data,
 write_rds(out, sprintf('stan_model_%s.rds',RUN_DATE),compress = 'gz')
 
 ### Extract results ----
-#out <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
+#out  <- read_rds(sprintf('models/backtest_2012/stan_model_%s.rds',RUN_DATE))
 
 # etc
 a <- rstan::extract(out, pars = "alpha")[[1]]
 hist(a)
 # delta
 delta <- rstan::extract(out, pars = "delta")[[1]]
-hist(delta)
+hist(delta,)
+# sigmas
+tibble(sigma_national = rstan::extract(out, pars = "sigma_a")[[1]],
+       sigma_state = rstan::extract(out, pars = "sigma_b")[[1]]) %>%
+  gather(parameter,value) %>%
+  ggplot(.,aes(x=value)) +
+  geom_histogram(binwidth=0.001) +
+  facet_grid(rows=vars(parameter))
+# look at variation in mu_a
+mu_a <- rstan::extract(out, pars = "mu_a")[[1]]
+lapply(1:100,
+       function(x){
+         tibble(mu_a_draw = inv.logit(mu_a[x,]),
+                trial = x) %>%
+           mutate(date = min(df$end) + row_number()) 
+       }) %>%
+  do.call('bind_rows',.) %>%
+  ggplot(.,aes(x=date,y=mu_a_draw,group=trial)) +
+  geom_line(alpha=0.2)
 # extract predictions
 predicted_score <- rstan::extract(out, pars = "predicted_score")[[1]]
 
@@ -420,7 +437,7 @@ p_clinton <- p_clinton %>%
   mutate(t = row_number() + min(df$begin)) %>%
   ungroup()
 
-ex_states <- c('IA','FL','OH','WI','MI','PA','AZ','NC','NH')
+ex_states <- c('IA','FL','OH','WI','MI','PA','NV','NC','NH')
 
 # together
 # national vote = vote * state weights
@@ -436,7 +453,16 @@ p_clinton <- p_clinton %>%
   )
 
 # look
-p_clinton %>% filter(t == max(t),state %in% ex_states) %>% mutate(se = (high - mean)/2)
+p_clinton %>% filter(t == max(t),state %in% c('--',ex_states)) %>% mutate(se = (high - mean)/2)
+
+urbnmapr::states %>%
+  left_join(p_clinton %>% filter(t == max(t)) %>%
+              select(state_abbv=state,prob)) %>%
+  ggplot(aes(x=long,y=lat,group=group,fill=prob)) +
+  geom_polygon()  + 
+  coord_map("albers",lat0=39, lat1=45) +
+  scale_fill_gradient2(high='blue',low='red',mid='white',midpoint=0.5) +
+  theme_void()
 
 
 # electoral college by simulation
@@ -464,6 +490,8 @@ sim_evs <- draws %>%
   summarise(mean_dem_ev = mean(dem_ev),
             high_dem_ev = quantile(dem_ev,0.975),
             low_dem_ev = quantile(dem_ev,0.025),
+            high_dem_ev_inner = quantile(dem_ev,0.95),
+            low_dem_ev_inner = quantile(dem_ev,0.05),
             prob = mean(dem_ev >= 270))
 
 # draws %>%
@@ -487,22 +515,25 @@ natl_polls.gg <- p_clinton %>%
   geom_ribbon(aes(ymin=low,ymax=high),col=NA,alpha=0.2) +
   geom_hline(yintercept = 0.5) +
   geom_hline(yintercept = national_mu_prior,linetype=2) +
-  geom_point(aes(y=p_clinton),alpha=0.5) +
-  #geom_smooth(aes(y=p_clinton),method='loess',span=0.2,col='black',linetype=2,se=F) +
+  geom_point(aes(y=p_clinton),alpha=0.2) +
+  geom_smooth(aes(y=p_clinton),method='loess',span=0.2,col='black',linetype=2,se=F) +
   geom_line(aes(y=mean)) +
   facet_wrap(~state) +
   theme_minimal()  +
   theme(legend.position = 'none') +
   scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b') +
+  scale_y_continuous(breaks=seq(0,1,0.02)) +
   labs(subtitle='p_clinton national')
 
 natl_evs.gg <-  ggplot(sim_evs, aes(x=t)) +
   geom_hline(yintercept = 270) +
   geom_line(aes(y=mean_dem_ev)) +
   geom_ribbon(aes(ymin=low_dem_ev,ymax=high_dem_ev),alpha=0.2) +
+  geom_ribbon(aes(ymin=low_dem_ev_inner,ymax=high_dem_ev_inner),alpha=0.2) +
   theme_minimal()  +
   theme(legend.position = 'none') +
   scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b') +
+  scale_y_continuous(breaks=seq(0,600,100)) +
   labs(subtitletitle='clinton evs')
 
 state_polls.gg <- p_clinton %>%
@@ -512,14 +543,16 @@ state_polls.gg <- p_clinton %>%
   ggplot(.,aes(x=t,col=state)) +
   geom_ribbon(aes(ymin=low,ymax=high),col=NA,alpha=0.2) +
   geom_hline(yintercept = 0.5) +
-  geom_point(aes(y=p_clinton),alpha=0.5) +
+  geom_point(aes(y=p_clinton),alpha=0.2) +
   #geom_smooth(aes(y=p_clinton,col=state),method='loess',linetype=2,se=F) +
   geom_line(aes(y=mean)) +
   facet_wrap(~state) +
   theme_minimal()  +
   theme(legend.position = 'none') +
   scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b') +
+  scale_y_continuous(breaks=seq(0,1,0.05)) +
   labs(subtitle='p_clinton state')
+
 
 grid.arrange(natl_polls.gg, natl_evs.gg, state_polls.gg, 
              layout_matrix = rbind(c(1,1,3,3,3),
@@ -574,8 +607,7 @@ p_clinton[p_clinton$state != '--',] %>%
   geom_hline(yintercept=0.0) +
   geom_line() +
   geom_label_repel(data = . %>% 
-                     filter(t==max(t),
-                            prob > 0.1 & prob < 0.9),
+                     filter(t==max(t),state %in% ex_states),
                    aes(label=state)) +
   theme_minimal()  +
   theme(legend.position = 'none') +
