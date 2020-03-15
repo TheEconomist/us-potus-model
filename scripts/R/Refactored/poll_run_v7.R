@@ -113,12 +113,16 @@ df <- df %>%
 polls_2012 <- read.csv("data/potus_results_76_16.csv")
 polls_2012 <- polls_2012 %>% 
   select(year, state, dem) %>%
-  group_by(state) %>%
-  mutate(dem = dem - lag(dem)) %>%
+  #group_by(state) %>%
+  #mutate(dem = dem - lag(dem)) %>%
   spread(state, dem) %>% 
   na.omit() %>%
   select(-year)
+
 state_correlation <- cor(polls_2012)  
+state_correlation <- make.positive.definite(state_correlation)
+
+state_correlation <- cor(polls_2008)  
 state_correlation <- make.positive.definite(state_correlation)
 
 #state_correlation_error <- state_correlation # covariance for backward walk
@@ -126,12 +130,12 @@ state_correlation <- make.positive.definite(state_correlation)
 state_correlation_error <- 0.08^2 * state_correlation
 
 #state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
-#state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.09, rho = 0.5) #1/20
-state_correlation_mu_b_T <- 0.09 * state_correlation
+state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.09, rho = 0.5) #1/20
+state_correlation_mu_b_T <- state_correlation_mu_b_T * state_correlation
 
 # state_correlation_mu_b_walk <- state_correlation
-#state_correlation_mu_b_walk <- cov_matrix(51, ((0.015)^2) / 7, 0.75) 
-state_correlation_mu_b_walk <- ((0.015)^2) / 7 * state_correlation
+state_correlation_mu_b_walk <- cov_matrix(51, ((0.015)^2) / 7, 0.75) 
+state_correlation_mu_b_walk <- state_correlation_mu_b_walk * state_correlation
 
 # Numerical indices passed to Stan for states, days, weeks, pollsters
 df <- df %>% 
@@ -653,5 +657,23 @@ tibble(outlet = c('538 polls-plus','538 polls-only','princeton','nyt upshot','kr
                    unwtd_brier = mean(compare$diff),
                    states_correct=sum(round(compare$clinton_win) == round(compare$clinton_win_actual)))) %>%
   arrange(ev_wtd_brier) 
+
+
+# model vs final polls vs prior
+p_clinton %>%
+  filter(t == max(t),state %in% ex_states) %>%
+  mutate(se = (high - mean)/2) %>%
+  select(state,model_mean=mean,model_se=se) %>%
+  left_join(df %>%
+              filter(t > (max(t)-14),
+                     state %in% ex_states) %>%
+              group_by(state) %>%
+              summarise(poll = weighted.mean(p_clinton,n_respondents))) %>%
+  left_join(enframe(mu_b_prior,'state','prior') %>%
+              mutate(prior = inv.logit(prior))) %>%
+  ggplot(.,aes(y=state)) +
+  geom_point(aes(x=poll,col='poll')) +
+  geom_point(aes(x=model_mean,col='model')) +
+  geom_point(aes(x=prior,col='prior'))
 
 
