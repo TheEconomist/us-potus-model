@@ -2,7 +2,7 @@ library(tidyverse)
 library(tidycensus)
 
 # you must have a census API key saved as a system variable
-census_api_key(Sys.getenv("CENSUS_API_KEY"))
+readRenviron("~/.Renviron")
 
 # get list of acs variables
 var_list <- tidycensus::load_variables(2017, "acs5")
@@ -141,5 +141,20 @@ fips_abb_cw$state <- c(state.abb,'DC')[match(fips_abb_cw$state_name,c(state.name
 census_estimates <- census_estimates %>%
   left_join(fips_abb_cw %>% select(-state_name))
 
-write_csv(census_estimates,'data/acs_2013_variables.csv')
+# add population density
+pop_density <- read_csv('data/acs_pop_density_2010.csv')
+  
+census_estimates <- census_estimates %>%
+  mutate(state_fips = as.numeric(state_fips)) %>%
+  left_join(pop_density %>% select(state_fips,pop_density))
 
+
+# make sure columns in right order
+census_estimates <- census_estimates %>%
+  select(state_fips,pop_total,white_pct,black_pct,
+         hisp_other_pct,college_pct,wwc_pct,
+         median_age,unemployed,pop_density,state)
+
+
+# write
+write_csv(census_estimates,'data/acs_2013_variables.csv')
