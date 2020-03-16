@@ -266,13 +266,13 @@ national_mu_prior <- national_mu_prior / 100
 
 
 # Mean of the mu_b_prior
-# 0.486 is the predicted Clinton share of the national vote according to the Lewis-Beck & Tien model
+# 0.486 is the predicted obama share of the national vote according to the Lewis-Beck & Tien model
 # https://pollyvote.com/en/components/econometric-models/lewis-beck-tien/
 mu_b_prior <- logit(national_mu_prior + prior_diff_score)
 
 # The model uses national polls to complement state polls when estimating the national term mu_a.
 # One problem until early September, was that voters in polled states were different from average voters :
-# Several solid red states still hadn't been polled, the weighted average of state polls was slightly more pro-Clinton than national polls.
+# Several solid red states still hadn't been polled, the weighted average of state polls was slightly more pro-obama than national polls.
 
 score_among_polled <- sum(states2008[all_polled_states[-1],]$obama_count)/
   sum(states2008[all_polled_states[-1],]$obama_count + 
@@ -304,12 +304,12 @@ data_1st <- list(
   n_two_parties = n_two_parties
 )
 # model
-m_1st <- rstan::stan_model("scripts/Stan/Refactored/poll_model_1st_stage_v1.stan")
+m_1st <- rstan::stan_model("scripts/Stan/Refactored/poll_model_1st_stage_v3.stan")
 # run
 out <- rstan::sampling(m_1st, data = data_1st, iter = 1000,warmup=500, chains = 2)
 # extract
-mean(as.integer(apply(rstan::extract(out, pars = "yrep")[[1]], MARGIN = 2, sd))) / mean(as.integer(apply(rstan::extract(out, pars = "yrep")[[1]], MARGIN = 2, median)))
-yrep_two_share <- as.integer(apply(rstan::extract(out, pars = "yrep")[[1]], MARGIN = 2, median))
+two_share_mu <- apply(rstan::extract(out, pars = "two_parties_mu")[[1]], MARGIN = 2, mean)
+two_share_sd <- apply(rstan::extract(out, pars = "two_parties_sd")[[1]], MARGIN = 2, mean)
 
 # Passing the data to Stan and running the model ---------
 N_state <- nrow(df %>% filter(index_s != 52))
@@ -328,20 +328,22 @@ n_democrat_national <- df %>% filter(index_s == 52) %>% pull(n_obama)
 n_democrat_state <- df %>% filter(index_s != 52) %>% pull(n_obama)
 n_two_share_national <- df %>% filter(index_s == 52) %>% transmute(n_two_share = n_romney + n_obama) %>% pull(n_two_share)
 n_two_share_state <- df %>% filter(index_s != 52) %>% transmute(n_two_share = n_romney + n_obama) %>% pull(n_two_share)
-#n_respondents <- df$n_clinton + df$n_trump
-share <- yrep_two_share/df$n_respondents
-pred_two_share_national <- share[df$index_s == 52]
-pred_two_share_state <- share[df$index_s != 52]
+#n_respondents <- df$n_obama + df$n_romney
+pred_two_share_national_mu    <- two_share_mu[52]
+pred_two_share_state_mu       <- two_share_mu[1:51]
+pred_two_share_national_sigma <- two_share_sd[52]
+pred_two_share_state_sigma    <- two_share_sd[1:51]
+
 
 # priors ---
 prior_sigma_measure_noise <- 0.005 ### 0.1 / 2
 prior_sigma_a <- 0.03 ### 0.05 / 2
 prior_sigma_b <- 0.04 ### 0.05 / 2
 mu_b_prior <- mu_b_prior
-prior_sigma_c <- 0.02 ### 0.1 / 2
+prior_sigma_c <- 0.01 ### 0.1 / 2
 mu_alpha <- alpha_prior
 sigma_alpha <- 0.2  ### 0.2
-prior_delta_sigma <- 0.1 ### guess
+prior_sigma_eta <- 0.2
 
 # data ---
 data <- list(
@@ -359,8 +361,10 @@ data <- list(
   n_democrat_state = n_democrat_state,
   n_two_share_national = n_two_share_national,
   n_two_share_state = n_two_share_state,
-  pred_two_share_national = pred_two_share_national,
-  pred_two_share_state = pred_two_share_state,
+  pred_two_share_national_mu = pred_two_share_national_mu,
+  pred_two_share_state_mu = pred_two_share_state_mu,
+  pred_two_share_national_sigma = pred_two_share_national_sigma,
+  pred_two_share_state_sigma = pred_two_share_state_sigma,
   current_T = as.integer(current_T),
   ss_correlation = state_correlation,
   ss_corr_mu_b_T = state_correlation_mu_b_T,
@@ -373,7 +377,7 @@ data <- list(
   prior_sigma_c = prior_sigma_c,
   mu_alpha = mu_alpha,
   sigma_alpha = sigma_alpha,
-  prior_delta_sigma = prior_delta_sigma
+  prior_sigma_eta = prior_sigma_eta
 )
 
 ### Initialization ----
@@ -404,7 +408,7 @@ init_ll <- lapply(1:n_chains, function(id) initf2(chain_id = id))
 #setwd(here("scripts/Stan/Refactored/"))
 
 # read model code
-model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v12.stan")
+model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v13.stan")
 
 # run model
 out <- rstan::sampling(model, data = data,

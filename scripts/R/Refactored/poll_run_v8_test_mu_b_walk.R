@@ -346,7 +346,7 @@ pred_two_share_state_sigma    <- two_share_sd[1:51]
 
 
 # priors ---
-prior_sigma_measure_noise <- 0.01 ### 0.1 / 2
+prior_sigma_measure_noise <- 0.005 ### 0.1 / 2
 prior_sigma_a <- 0.03 ### 0.05 / 2
 prior_sigma_b <- 0.04 ### 0.05 / 2
 mu_b_prior <- mu_b_prior
