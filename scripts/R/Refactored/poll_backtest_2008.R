@@ -2,7 +2,7 @@
 # Refactored version run file
 
 ## Setup
-rm(list = ls())
+#rm(list = ls())
 options(mc.cores = parallel::detectCores())
 
 ## Libraries
@@ -105,21 +105,51 @@ df <- df %>%
 # create correlation matrix ---------------------------------------------
 
 #here("data")
-polls_2008 <- read.csv("data/potus_results_76_16.csv")
-polls_2008 <- polls_2008 %>% 
+state_data <- read.csv("data/potus_results_76_16.csv")
+state_data <- state_data %>% 
   select(year, state, dem) %>%
-  #group_by(state) %>%
-  #mutate(dem = dem - lag(dem)) %>%
-  spread(state, dem) %>% 
-  na.omit() %>%
-  select(-year)
+  group_by(state) %>%
+  mutate(dem = dem - lag(dem)) %>%
+  select(state,variable=year,value=dem)  %>%
+  ungroup() %>%
+  na.omit()
+  
+census <- read.csv('data/acs_2013_variables.csv')
+census <- census %>%
+  filter(!is.na(state)) %>% 
+  select(-state_fips) %>%
+  group_by(state) %>%
+  gather(variable,value,
+         1:(ncol(.)-1))
 
-state_correlation <- cor(polls_2008)  
+state_data <- state_data %>%
+  mutate(variable = as.character(variable)) %>%
+  bind_rows(census)
+
+state_data <- state_data %>%
+  group_by(variable) %>%
+  # scale all varaibles
+  mutate(value = value/max(value)) %>%
+  # now spread
+  spread(state, value) %>% 
+  na.omit() %>%
+  ungroup() %>%
+  select(-variable)
+
+# test
+#plot(state_data$MN,state_data$TX)
+state_data %>% 
+  select(MN,WI,IN,MI,IL,IA,PA,NY,TX,CA,OK,LA) %>% 
+  cor 
+
+# make matrices
+state_correlation <- cor(state_data)  
 state_correlation <- make.positive.definite(state_correlation)
+state_correlation[state_correlation < 0] <- 0 # nothing should be negatively correlated
 
 #state_correlation_error <- state_correlation # covariance for backward walk
-#state_correlation_error <- cov_matrix(51, 0.08^2, .8) # 0.08^2
-state_correlation_error <- 0.08^2 * state_correlation
+state_correlation_error <- cov_matrix(51, 0.08^2, 1) # 0.08^2
+state_correlation_error <- state_correlation_error * state_correlation
 
 #state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
 state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.09, rho = 0.5) #1/20
@@ -129,6 +159,8 @@ state_correlation_mu_b_T <- state_correlation_mu_b_T * state_correlation
 state_correlation_mu_b_walk <- cov_matrix(51, ((0.015)^2) / 7, 0.75) 
 state_correlation_mu_b_walk <- state_correlation_mu_b_walk * state_correlation
 
+
+# final poll wrangling ----
 # Numerical indices passed to Stan for states, days, weeks, pollsters
 df <- df %>% 
   mutate(poll_day = t - min(t) + 1,
@@ -248,7 +280,7 @@ alpha_prior <- log(states2008$national_score[1]/score_among_polled)
 
 
 # checking the amounts of error in the correlation matrices
-y <- MASS::mvrnorm(10000, mu_b_prior, Sigma = state_correlation_mu_b_T)
+y <- MASS::mvrnorm(10000, mu_b_prior, Sigma = state_correlation_error)
 
 mean( inv.logit(apply(y, MARGIN = 2, mean) +  apply(y, MARGIN = 2, sd)) - inv.logit(apply(y, MARGIN = 2, mean)) )
 
@@ -300,7 +332,7 @@ pred_two_share_national <- share[df$index_s == 52]
 pred_two_share_state <- share[df$index_s != 52]
 
 # priors ---
-prior_sigma_measure_noise <- 0.01 ### 0.1 / 2
+prior_sigma_measure_noise <- 0.005 ### 0.1 / 2
 prior_sigma_a <- 0.03 ### 0.05 / 2
 prior_sigma_b <- 0.04 ### 0.05 / 2
 mu_b_prior <- mu_b_prior
@@ -383,7 +415,7 @@ out <- rstan::sampling(model, data = data,
 write_rds(out, sprintf('models/backtest_2008/stan_model_%s.rds',RUN_DATE),compress = 'gz')
 
 ### Extract results ----
-#out  <- read_rds(sprintf('models/backtest_2012/stan_model_%s.rds',RUN_DATE))
+# out  <- read_rds(sprintf('models/backtest_2008/stan_model_%s.rds',RUN_DATE))
 
 # etc
 a <- rstan::extract(out, pars = "alpha")[[1]]
@@ -436,7 +468,7 @@ p_obama <- p_obama %>%
   mutate(t = row_number() + min(df$begin)) %>%
   ungroup()
 
-ex_states <- c('MT','FL','OH','IN','CO','PA','VA','NC','NH')
+ex_states <- c('MT','FL','OH','IN','CO','PA','MO','NC','NH')
 
 # together
 # national vote = vote * state weights
@@ -505,12 +537,11 @@ natl_polls.gg <- p_obama %>%
   left_join(df %>% select(state,t,p_obama)) %>% # plot over time
   # plot
   ggplot(.,aes(x=t)) +
-  
   geom_ribbon(aes(ymin=low,ymax=high),col=NA,alpha=0.2) +
   geom_hline(yintercept = 0.5) +
   geom_hline(yintercept = national_mu_prior,linetype=2) +
   geom_point(aes(y=p_obama),alpha=0.2) +
-  #geom_smooth(aes(y=p_obama),method='loess',span=0.2,col='black',linetype=2,se=F) +
+  geom_smooth(aes(y=p_obama),method='loess',span=0.2,col='black',linetype=2,se=F) +
   geom_line(aes(y=mean)) +
   facet_wrap(~state) +
   theme_minimal()  +
@@ -602,27 +633,6 @@ p_obama[p_obama$state != '--',] %>%
   scale_y_continuous(breaks=seq(-1,1,0.01)) +
   labs(subtitle = identifier)
 
-# avg standard error over time
-
-# final EV distribution
-final_evs <- draws %>%
-  left_join(states2008 %>% select(state,ev),by='state') %>%
-  filter(t==max(t)) %>%
-  group_by(draw) %>%
-  summarise(dem_ev = sum(ev* (p_obama > 0.5)))
-
-ggplot(final_evs,aes(x=dem_ev,
-                     fill=ifelse(dem_ev>=270,'Democratic','Republican'))) +
-  geom_vline(xintercept = 270) +
-  geom_histogram(binwidth=1) +
-  theme_minimal() +
-  theme(legend.position = 'top',
-        panel.grid.minor = element_blank()) +
-  scale_fill_manual(name='Electoral College winner',values=c('Democratic'='#3A4EB1','Republican'='#E40A04')) +
-  labs(x='Democratic electoral college votes',
-       subtitle=sprintf("p(dem win) = %s",round(mean(final_evs$dem_ev>=270),3)))
-
-
 # brier scores
 # https://www.buzzfeednews.com/article/jsvine/2016-election-forecast-grades
 compare <- p_obama %>% 
@@ -634,11 +644,12 @@ compare <- p_obama %>%
   mutate(ev_weight = ev/(sum(ev))) 
 
 
-tibble(outlet='economist (backtest)',
+briers.2008 <- tibble(outlet='economist (backtest)',
        ev_wtd_brier = weighted.mean(compare$diff, compare$ev_weight),
        unwtd_brier = mean(compare$diff),
        states_correct=sum(round(compare$obama_win) == round(compare$obama_win_actual)))
 
+briers.2008
 
 # model vs final polls vs prior
 p_obama %>%
@@ -657,3 +668,61 @@ p_obama %>%
   geom_point(aes(x=model_mean,col='model')) +
   geom_point(aes(x=prior,col='prior'))
 
+# expected EVs roughly match the stochastic simulations?
+final_states <- enframe(mu_b_prior,'state','prior') %>%
+  left_join(df %>%
+              filter(t > (max(t)-14),) %>%
+              group_by(state) %>%
+              summarise(poll = weighted.mean(p_obama,n_respondents))) %>%
+  mutate(avg_poll_less_prior = mean(poll - inv.logit(prior), na.rm=T)) %>%
+  mutate(poll = ifelse(is.na(poll),
+                       inv.logit(prior) + avg_poll_less_prior,
+                       poll)) %>%
+  select(state,poll)
+
+errors <- mvtnorm::rmvnorm(100000, sigma = state_correlation) * 0.1^2
+
+generated_evs <- lapply(1:ncol(errors),
+                        function(x){
+                          tibble( errors[,x] + final_states$poll[x]) %>% setNames(.,c(final_states$state[x]))
+                        }) %>%
+  bind_cols() %>%
+  as.data.frame() %>%
+  mutate(trial = row_number()) %>%
+  gather(state,p_obama,1:(ncol(.)-1)) %>%
+  left_join(states2008 %>% select(state,ev)) %>%
+  group_by(trial) %>%
+  summarise(dem_ev = sum((p_obama>0.5)*ev))
+
+# final EV distribution
+final_evs <- draws %>%
+  left_join(states2008 %>% select(state,ev),by='state') %>%
+  filter(t==max(t)) %>%
+  group_by(draw) %>%
+  summarise(dem_ev = sum(ev* (p_obama > 0.5)))
+
+
+grid.arrange(
+  ggplot(final_evs,aes(x=dem_ev,
+                       fill=ifelse(dem_ev>=270,'Democratic','Republican'))) +
+    geom_vline(xintercept = 270) +
+    geom_histogram(binwidth=1) +
+    theme_minimal() +
+    theme(legend.position = 'top',
+          panel.grid.minor = element_blank()) +
+    scale_fill_manual(name='Electoral College winner',values=c('Democratic'='#3A4EB1','Republican'='#E40A04')) +
+    labs(x='Democratic electoral college votes',title='2008, Potential Electoral College outcomes',
+         subtitle=sprintf("p(dem win) = %s | full stan model",round(mean(final_evs$dem_ev>=270),3))),
+  
+
+    ggplot(generated_evs,aes(x=dem_ev,
+                         fill=ifelse(dem_ev>=270,'Democratic','Republican'))) +
+    geom_vline(xintercept = 270) +
+    geom_histogram(binwidth=1) +
+    theme_minimal() +
+    theme(legend.position = 'top',
+          panel.grid.minor = element_blank()) +
+    scale_fill_manual(name='Electoral College winner',values=c('Democratic'='#3A4EB1','Republican'='#E40A04')) +
+    labs(x='Winner',
+         subtitle=sprintf("p(dem win) = %s | simple rmvnorm simulations",round(mean(generated_evs$dem_ev>=270),3)))
+)

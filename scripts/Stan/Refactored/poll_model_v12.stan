@@ -134,7 +134,7 @@ model {
   raw_sigma_a ~ std_normal();
   raw_mu_a ~ std_normal_lpdf();
   // mu_b
-  raw_mu_b_T ~ std_normal();
+  raw_mu_b_T ~ cauchy(0,1);
   raw_sigma_b ~ std_normal();
   for (s in 1:S) raw_mu_b[s] ~ std_normal();
   // mu_c
