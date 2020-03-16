@@ -113,11 +113,11 @@ state_data <- state_data %>%
   select(state,variable=year,value=dem)  %>%
   ungroup() %>%
   na.omit()
-  
+
 census <- read.csv('data/acs_2013_variables.csv')
 census <- census %>%
   filter(!is.na(state)) %>% 
-  select(-state_fips) %>%
+  select(-c(state_fips)) %>%
   group_by(state) %>%
   gather(variable,value,
          1:(ncol(.)-1))
@@ -129,7 +129,8 @@ state_data <- state_data %>%
 state_data <- state_data %>%
   group_by(variable) %>%
   # scale all varaibles
-  mutate(value = value/max(value)) %>%
+  mutate(value = (value - min(value, na.rm=T)) / 
+           (max(value, na.rm=T) - min(value, na.rm=T))) %>%
   # now spread
   spread(state, value) %>% 
   na.omit() %>%
@@ -137,15 +138,15 @@ state_data <- state_data %>%
   select(-variable)
 
 # test
-#plot(state_data$MN,state_data$TX)
+# plot(state_data$AL, state_data$MN)
 state_data %>% 
-  select(MN,WI,IN,MI,IL,IA,PA,NY,TX,CA,OK,LA) %>% 
+  select(AL,CA,FL,MN,NC,NM,RI,WI) %>% 
   cor 
 
 # make matrices
 state_correlation <- cor(state_data)  
-state_correlation <- make.positive.definite(state_correlation)
 state_correlation[state_correlation < 0] <- 0 # nothing should be negatively correlated
+state_correlation <- make.positive.definite(state_correlation)
 
 #state_correlation_error <- state_correlation # covariance for backward walk
 state_correlation_error <- cov_matrix(51, 0.08^2, 1) # 0.08^2

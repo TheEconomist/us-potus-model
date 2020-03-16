@@ -12,11 +12,17 @@ cov_matrix <- function(n, sigma2, rho){
 T <- 50
 S <- 51
 current_T <- T - round(runif(1, 3, 25))
+<<<<<<< HEAD
 mu_b_walk_cov_matrix <- cov_matrix(S, sigma2 = 0.02^2, rho = 0.3)
 error_cov_matrix <- cov_matrix(S, sigma2 = 0.01^2, 0.5)
 
 
 mu_b <- matrix(NA, ncol = S, nrow = T)
+=======
+
+mu_b <- matrix(NA, ncol = S, nrow = T)
+mu_b_walk_cov_matrix <- cov_matrix(S, sigma2 = 0.02^2, rho = 0.3)
+>>>>>>> 172628dac621f8ea04b7b53e237ab59df8d4ef01
 
 mu_b[1, ] <- rbeta(S, 10, 10)
 for (t in 2:T){
@@ -37,9 +43,13 @@ if (plot){
 ## data
 N <- 1.5e3
 national_prob <- 0.3
+<<<<<<< HEAD
 national <- rbinom(N, 1, prob = national_prob)
 state <- ifelse(national == 0, sample(1:S, N, replace = TRUE), 0)
 
 
 
 
+=======
+national <- rbinom(N, 1, prob = national_prob)
+>>>>>>> 172628dac621f8ea04b7b53e237ab59df8d4ef01
