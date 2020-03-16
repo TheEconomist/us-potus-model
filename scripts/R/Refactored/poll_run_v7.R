@@ -2,7 +2,7 @@
 # Refactored version run file
 
 ## Setup
-#rm(list = ls())
+rm(list = ls())
 options(mc.cores = parallel::detectCores())
 
 ## Libraries
@@ -29,11 +29,11 @@ options(mc.cores = parallel::detectCores())
 
 
 cov_matrix <- function(n, sigma2, rho){
-    m <- matrix(nrow = n, ncol = n)
-    m[upper.tri(m)] <- rho
-    m[lower.tri(m)] <- rho
-    diag(m) <- 1
-    (sigma2^.5 * diag(n))  %*% m %*% (sigma2^.5 * diag(n))
+  m <- matrix(nrow = n, ncol = n)
+  m[upper.tri(m)] <- rho
+  m[lower.tri(m)] <- rho
+  diag(m) <- 1
+  (sigma2^.5 * diag(n))  %*% m %*% (sigma2^.5 * diag(n))
 }
 
 ## Master variables
@@ -105,6 +105,8 @@ df <- df %>%
          p_other = other/100)
 
 
+
+
 # prepare stan date -----------------------------------------------------------
 
 # create correlation matrix ---------------------------------------------
@@ -165,7 +167,8 @@ state_correlation_mu_b_T <- state_correlation_mu_b_T * state_correlation
 state_correlation_mu_b_walk <- cov_matrix(51, ((0.015)^2) / 7, 0.75) 
 state_correlation_mu_b_walk <- state_correlation_mu_b_walk * state_correlation
 
-# final poll wrangling ----
+
+# final poll wrangling ----------------------------------------------------
 # Numerical indices passed to Stan for states, days, weeks, pollsters
 df <- df %>% 
   mutate(poll_day = t - min(t) + 1,
@@ -190,7 +193,6 @@ df <- df %>%
     p_other, n_other, poll_day, index_s, index_p, index_t) %>%
   mutate(index_s = ifelse(index_s == 1, 52, index_s - 1)) # national index = 51
 
-# final poll wrangling ----
 # Useful vectors ---------
 # we want to select all states, so we comment this out
 # and later declare all_polled_states to be all of them + national '--'
@@ -288,7 +290,10 @@ alpha_prior <- log(states2012$national_score[1]/score_among_polled)
 
 y <- MASS::mvrnorm(1000, mu_b_prior, Sigma = state_correlation_error)
 
-mean( inv.logit(apply(y, MARGIN = 2, mean)  + apply(y, MARGIN = 2, sd)) - inv.logit(apply(y, MARGIN = 2, mean)) )
+cbind(
+  inv.logit(apply(y, MARGIN = 2, mean)),
+  inv.logit(apply(y, MARGIN = 2, mean) + 1.96 * apply(y, MARGIN = 2, sd)), 
+  inv.logit(apply(y, MARGIN = 2, mean) - 1.96 * apply(y, MARGIN = 2, sd)))
 
 
 # First stage predictions -------
@@ -332,7 +337,7 @@ n_democrat_national <- df %>% filter(index_s == 52) %>% pull(n_clinton)
 n_democrat_state <- df %>% filter(index_s != 52) %>% pull(n_clinton)
 n_two_share_national <- df %>% filter(index_s == 52) %>% transmute(n_two_share = n_trump + n_clinton) %>% pull(n_two_share)
 n_two_share_state <- df %>% filter(index_s != 52) %>% transmute(n_two_share = n_trump + n_clinton) %>% pull(n_two_share)
-#n_respondents <- df$n_clinton + df$n_trump
+#n_respondents <- df$n_obama + df$n_romney
 share <- yrep_two_share/df$n_respondents
 pred_two_share_national <- share[df$index_s == 52]
 pred_two_share_state <- share[df$index_s != 52]
@@ -421,7 +426,7 @@ out <- rstan::sampling(model, data = data,
 write_rds(out, sprintf('models/stan_model_%s.rds',RUN_DATE),compress = 'gz')
 
 ### Extract results ----
-# out  <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
+#out <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
 
 # etc
 a <- rstan::extract(out, pars = "alpha")[[1]]
@@ -454,18 +459,18 @@ lapply(1:100,
 predicted_score <- rstan::extract(out, pars = "predicted_score")[[1]]
 
 p_clinton <- pblapply(1:dim(predicted_score)[3],
-                    function(x){
-                      # pred is mu_a + mu_b for the past, just mu_b for the future
-                      p_clinton <- predicted_score[,,x]
-                      
-                      # put in tibble
-                      tibble(low = apply(p_clinton,2,function(x){(quantile(x,0.05))}),
-                             high = apply(p_clinton,2,function(x){(quantile(x,0.95))}),
-                             mean = apply(p_clinton,2,function(x){(mean(x))}),
-                             prob = apply(p_clinton,2,function(x){(mean(x>0.5))}),
-                             state = x) 
-                      
-                    }) %>% do.call('bind_rows',.)
+                      function(x){
+                        # pred is mu_a + mu_b for the past, just mu_b for the future
+                        p_clinton <- predicted_score[,,x]
+                        
+                        # put in tibble
+                        tibble(low = apply(p_clinton,2,function(x){(quantile(x,0.05))}),
+                               high = apply(p_clinton,2,function(x){(quantile(x,0.95))}),
+                               mean = apply(p_clinton,2,function(x){(mean(x))}),
+                               prob = apply(p_clinton,2,function(x){(mean(x>0.5))}),
+                               state = x) 
+                        
+                      }) %>% do.call('bind_rows',.)
 
 p_clinton$state = colnames(state_correlation)[p_clinton$state]
 
@@ -596,8 +601,14 @@ ggplot(sim_evs, aes(x=t)) +
   geom_hline(yintercept = 0.5) +
   geom_line(aes(y=prob))  +
   coord_cartesian(ylim=c(0,1)) +
-  geom_hline(data=tibble(forecaster = c('pec','fivethirtyeight'),
-                         prob = c(0.99,0.909)),
+  geom_hline(data=tibble(forecaster = c('nyt',
+                                        'fivethirtyeight',
+                                        'huffpost',
+                                        'predictwise',
+                                        'pec',
+                                        'dailykos',
+                                        'morris16'),
+                         prob = c(0.85,0.71,0.98,0.89,0.99,0.92,0.84)),
              aes(yintercept=prob,col=forecaster),linetype=2) +
   labs(subtitle = identifier)
 
@@ -610,7 +621,8 @@ p_clinton %>%
   geom_hline(yintercept=0.5) +
   geom_line() +
   geom_label_repel(data = p_clinton %>% 
-                     filter(t==max(t),state %in% ex_states),
+                     filter(t==max(t),
+                            prob > 0.1 & prob < 0.9),
                    aes(label=state)) +
   theme_minimal()  +
   theme(legend.position = 'none') +
@@ -631,7 +643,7 @@ p_clinton[p_clinton$state != '--',] %>%
   geom_line() +
   geom_label_repel(data = . %>% 
                      filter(t==max(t),
-                            state %in% ex_states),
+                            prob > 0.1 & prob < 0.9),
                    aes(label=state)) +
   theme_minimal()  +
   theme(legend.position = 'none') +
@@ -639,26 +651,27 @@ p_clinton[p_clinton$state != '--',] %>%
   scale_y_continuous(breaks=seq(-1,1,0.01)) +
   labs(subtitle = identifier)
 
+
 # brier scores
 # https://www.buzzfeednews.com/article/jsvine/2016-election-forecast-grades
 compare <- p_clinton %>% 
   filter(t==max(t),state!='--') %>% 
-  select(state,clinton_win = prob) %>% 
+  select(state,clinton_win=prob) %>% 
   mutate(clinton_win_actual = ifelse(state %in% c('CA','NV','OR','WA','CO','NM','MN','IL','VA','DC','MD','DE','NJ','CT','RI','MA','NH','VT','NY','HI','ME'),1,0),
-         diff = (clinton_win_actual - clinton_win )^2) %>% 
-  left_join(enframe(ev_state) %>% set_names(.,c('state','ev'))) %>% 
+         diff = (clinton_win_actual - clinton_win )^2) %>% left_join(enframe(ev_state) %>% set_names(.,c('state','ev'))) %>% 
   mutate(ev_weight = ev/(sum(ev))) 
 
 
 briers.2016 <- tibble(outlet = c('538 polls-plus','538 polls-only','princeton','nyt upshot','kremp/slate','pollsavvy','predictwise markets','predictwise overall','desart and holbrook','daily kos','huffpost'),
-       ev_wtd_brier = c(0.0928,0.0936,0.1169,0.1208,0.121,0.1219,0.1272,0.1276,0.1279,0.1439,0.1505),
-       unwtd_brier = c(0.0664,0.0672,0.0744,0.0801,0.0766,0.0794,0.0767,0.0783,0.0825,0.0864,0.0892),
-       states_correct = c(46,46,47,46,46,46,46,46,44,46,46)) %>% 
+                      ev_wtd_brier = c(0.0928,0.0936,0.1169,0.1208,0.121,0.1219,0.1272,0.1276,0.1279,0.1439,0.1505),
+                      unwtd_brier = c(0.0664,0.0672,0.0744,0.0801,0.0766,0.0794,0.0767,0.0783,0.0825,0.0864,0.0892),
+                      states_correct = c(46,46,47,46,46,46,46,46,44,46,46)) %>% 
   bind_rows(tibble(outlet='economist (backtest)',
                    ev_wtd_brier = weighted.mean(compare$diff, compare$ev_weight),
                    unwtd_brier = mean(compare$diff),
                    states_correct=sum(round(compare$clinton_win) == round(compare$clinton_win_actual)))) %>%
   arrange(ev_wtd_brier) 
+
 
 briers.2016
 
@@ -711,7 +724,6 @@ final_evs <- draws %>%
   filter(t==max(t)) %>%
   group_by(draw) %>%
   summarise(dem_ev = sum(ev* (p_clinton > 0.5)))
-
 
 grid.arrange(
   ggplot(final_evs,aes(x=dem_ev,

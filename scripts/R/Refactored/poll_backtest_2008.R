@@ -304,12 +304,11 @@ data_1st <- list(
   n_two_parties = n_two_parties
 )
 # model
-m_1st <- rstan::stan_model("scripts/Stan/Refactored/poll_model_1st_stage_v3.stan")
+m_1st <- rstan::stan_model("scripts/Stan/Refactored/poll_model_1st_stage_v1.stan")
 # run
 out <- rstan::sampling(m_1st, data = data_1st, iter = 1000,warmup=500, chains = 2)
 # extract
-two_share_mu <- apply(rstan::extract(out, pars = "two_parties_mu")[[1]], MARGIN = 2, mean)
-two_share_sd <- apply(rstan::extract(out, pars = "two_parties_sd")[[1]], MARGIN = 2, mean)
+yrep_two_share <- as.integer(apply(rstan::extract(out, pars = "yrep")[[1]], MARGIN = 2, median))
 
 # Passing the data to Stan and running the model ---------
 N_state <- nrow(df %>% filter(index_s != 52))
@@ -329,21 +328,19 @@ n_democrat_state <- df %>% filter(index_s != 52) %>% pull(n_obama)
 n_two_share_national <- df %>% filter(index_s == 52) %>% transmute(n_two_share = n_mccain + n_obama) %>% pull(n_two_share)
 n_two_share_state <- df %>% filter(index_s != 52) %>% transmute(n_two_share = n_mccain + n_obama) %>% pull(n_two_share)
 #n_respondents <- df$n_obama + df$n_mccain
-pred_two_share_national_mu    <- two_share_mu[52]
-pred_two_share_state_mu       <- two_share_mu[1:51]
-pred_two_share_national_sigma <- two_share_sd[52]
-pred_two_share_state_sigma    <- two_share_sd[1:51]
-
+share <- yrep_two_share/df$n_respondents
+pred_two_share_national <- share[df$index_s == 52]
+pred_two_share_state <- share[df$index_s != 52]
 
 # priors ---
 prior_sigma_measure_noise <- 0.005 ### 0.1 / 2
 prior_sigma_a <- 0.03 ### 0.05 / 2
 prior_sigma_b <- 0.04 ### 0.05 / 2
 mu_b_prior <- mu_b_prior
-prior_sigma_c <- 0.01 ### 0.1 / 2
+prior_sigma_c <- 0.02 ### 0.1 / 2
 mu_alpha <- alpha_prior
 sigma_alpha <- 0.2  ### 0.2
-prior_sigma_eta <- 0.2
+prior_delta_sigma <- 0.1 ### guess
 
 # data ---
 data <- list(
@@ -361,10 +358,8 @@ data <- list(
   n_democrat_state = n_democrat_state,
   n_two_share_national = n_two_share_national,
   n_two_share_state = n_two_share_state,
-  pred_two_share_national_mu = pred_two_share_national_mu,
-  pred_two_share_state_mu = pred_two_share_state_mu,
-  pred_two_share_national_sigma = pred_two_share_national_sigma,
-  pred_two_share_state_sigma = pred_two_share_state_sigma,
+  pred_two_share_national = pred_two_share_national,
+  pred_two_share_state = pred_two_share_state,
   current_T = as.integer(current_T),
   ss_correlation = state_correlation,
   ss_corr_mu_b_T = state_correlation_mu_b_T,
@@ -377,7 +372,7 @@ data <- list(
   prior_sigma_c = prior_sigma_c,
   mu_alpha = mu_alpha,
   sigma_alpha = sigma_alpha,
-  prior_sigma_eta = prior_sigma_eta
+  prior_delta_sigma = prior_delta_sigma
 )
 
 ### Initialization ----
@@ -408,7 +403,7 @@ init_ll <- lapply(1:n_chains, function(id) initf2(chain_id = id))
 #setwd(here("scripts/Stan/Refactored/"))
 
 # read model code
-model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v13.stan")
+model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v12.stan")
 
 # run model
 out <- rstan::sampling(model, data = data,
