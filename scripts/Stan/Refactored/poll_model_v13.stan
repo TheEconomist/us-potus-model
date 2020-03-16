@@ -133,7 +133,7 @@ transformed parameters {
   }
   // national
   logit_pi_democrat_national = mu_a[day_national] + alpha + mu_c[poll_national] + 
-      measure_noise_national * sigma_measure_noise_state + eta * delta_national;
+      measure_noise_national * sigma_measure_noise_national + eta * delta_national;
 }
 model {
   //*** priors
@@ -141,7 +141,7 @@ model {
   raw_alpha ~ std_normal();
   // mu_a
   raw_sigma_a ~ std_normal();
-  raw_mu_a ~ std_normal_lpdf();
+  raw_mu_a ~ std_normal();
   // mu_b
   raw_mu_b_T ~ std_normal();
   raw_sigma_b ~ std_normal();

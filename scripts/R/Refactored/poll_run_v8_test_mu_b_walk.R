@@ -37,7 +37,7 @@ cov_matrix <- function(n, sigma2, rho){
 }
 
 ## Master variables
-RUN_DATE <- min(ymd('2016-11-08'),Sys.Date())
+RUN_DATE <- min(ymd('2016-10-01'),Sys.Date())
 
 election_day <- ymd("2016-11-08")
 start_date <- as.Date("2016-03-01") # Keeping all polls after March 1, 2016
@@ -112,19 +112,60 @@ df <- df %>%
 # create correlation matrix ---------------------------------------------
 
 #here("data")
-polls_2012 <- read.csv("data/potus_results_76_16.csv")
-polls_2012 <- polls_2012 %>% 
+state_data <- read.csv("data/potus_results_76_16.csv")
+state_data <- state_data %>% 
   select(year, state, dem) %>%
-  spread(state, dem) %>% select(-year)
-state_correlation <- cor(polls_2012)  
+  group_by(state) %>%
+  mutate(dem = dem - lag(dem)) %>%
+  select(state,variable=year,value=dem)  %>%
+  ungroup() %>%
+  na.omit()
+
+census <- read.csv('data/acs_2013_variables.csv')
+census <- census %>%
+  filter(!is.na(state)) %>% 
+  select(-c(state_fips)) %>%
+  group_by(state) %>%
+  gather(variable,value,
+         1:(ncol(.)-1))
+
+state_data <- state_data %>%
+  mutate(variable = as.character(variable)) %>%
+  bind_rows(census)
+
+state_data <- state_data %>%
+  group_by(variable) %>%
+  # scale all varaibles
+  mutate(value = (value - min(value, na.rm=T)) / 
+           (max(value, na.rm=T) - min(value, na.rm=T))) %>%
+  # now spread
+  spread(state, value) %>% 
+  na.omit() %>%
+  ungroup() %>%
+  select(-variable)
+
+# test
+# plot(state_data$AL, state_data$MN)
+state_data %>% 
+  select(AL,CA,FL,MN,NC,NM,RI,WI) %>% 
+  cor 
+
+# make matrices
+state_correlation <- cor(state_data)  
+state_correlation[state_correlation < 0] <- 0 # nothing should be negatively correlated
+state_correlation <- make.positive.definite(state_correlation)
 
 #state_correlation_error <- state_correlation # covariance for backward walk
-state_correlation_error <- cov_matrix(51, 0.1^2, .8) # 0.08^2
+state_correlation_error <- cov_matrix(51, 0.08^2, 1) # 0.08^2
 state_correlation_error <- state_correlation_error * state_correlation
 
 #state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
 state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.09, rho = 0.5) #1/20
 state_correlation_mu_b_T <- state_correlation_mu_b_T * state_correlation
+
+# state_correlation_mu_b_walk <- state_correlation
+state_correlation_mu_b_walk <- cov_matrix(51, ((0.015)^2) / 7, 0.75) 
+state_correlation_mu_b_walk <- state_correlation_mu_b_walk * state_correlation
 
 
 # Numerical indices passed to Stan for states, days, weeks, pollsters
@@ -650,13 +691,12 @@ for (i_mu_b_walk in 1:len_mu_b_walk_sd){
 
 write_rds(output_list, sprintf('models/output_mu_b_walk_test_%s.rds',RUN_DATE),compress = 'gz')
 
-## by_states
 output_list[[1]][["by_states"]]
 output_list[[4]][["by_states"]]
 
 ## joint
-output_list[[1]][["joint_plt"]]
-output_list[[4]][["joint_plt"]]
+grid.arrange(output_list[[1]][["joint_plt"]])
+grid.arrange(output_list[[4]][["joint_plt"]])
 
 ## final_evs
 output_list[[1]][["plt_final_evs"]]
@@ -664,4 +704,7 @@ output_list[[4]][["plt_final_evs"]]
 
 ## brier
 output_list[[1]][["brier"]]
+output_list[[2]][["brier"]]
+output_list[[3]][["brier"]]
 output_list[[4]][["brier"]]
+

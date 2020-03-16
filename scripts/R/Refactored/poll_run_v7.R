@@ -110,7 +110,6 @@ df <- df %>%
 # create correlation matrix ---------------------------------------------
 
 #here("data")
-#here("data")
 state_data <- read.csv("data/potus_results_76_16.csv")
 state_data <- state_data %>% 
   select(year, state, dem) %>%
