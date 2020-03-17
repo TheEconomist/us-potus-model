@@ -37,7 +37,7 @@ cov_matrix <- function(n, sigma2, rho){
 }
 
 ## Master variables
-RUN_DATE <- min(ymd('2016-10-01'),Sys.Date())
+RUN_DATE <- min(ymd('2016-09-01'),Sys.Date())
 
 election_day <- ymd("2016-11-08")
 start_date <- as.Date("2016-03-01") # Keeping all polls after March 1, 2016
@@ -368,7 +368,7 @@ model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v13.stan")
 for (i_mu_b_walk in 1:len_mu_b_walk_sd){
   output_list[[i_mu_b_walk]] <- list()
   output_list[[i_mu_b_walk]][["sd_val"]] <- mu_b_walk_sd[i_mu_b_walk]
-  state_correlation_mu_b_walk <- cov_matrix(51, (mu_b_walk_sd[i_mu_b_walk]^2) / 7, 0.75) 
+  state_correlation_mu_b_walk <- cov_matrix(51, (mu_b_walk_sd[i_mu_b_walk]^2) , 0.75) 
   state_correlation_mu_b_walk <- state_correlation_mu_b_walk * state_correlation
   
   
@@ -700,6 +700,8 @@ grid.arrange(output_list[[4]][["joint_plt"]])
 
 ## final_evs
 output_list[[1]][["plt_final_evs"]]
+output_list[[2]][["plt_final_evs"]]
+output_list[[3]][["plt_final_evs"]]
 output_list[[4]][["plt_final_evs"]]
 
 ## brier

@@ -18,6 +18,9 @@ library(boot)
 library(pbapply)
 library(urbnmapr)
 library(ggrepel)
+
+# copy/paste this code to console to run all models again and render this document:
+# source('scripts/R/Refactored/poll_backtest_2008.R');source('scripts/R/Refactored/poll_backtest_2012.R');source('scripts/R/Refactored/poll_run_v7.R');rmarkdown::render('model_summary.Rmd');beepr::beep(2);beepr::beep(2)
 ```
 
 ## Methodology
