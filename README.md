@@ -18,6 +18,6 @@ Improving on Pierre Kremp's implementation of Drew Linzer's dynamic linear model
 
 [See Kremp's original description...](http://www.slate.com/features/pkremp_forecast/report.html)
 
-## Possible election-night live updating
+## Possible live-updating forecast on election night
 
 [See Gelman and Silver 2020](http://www.stat.columbia.edu/~gelman/research/published/electionnight4.pdf)
