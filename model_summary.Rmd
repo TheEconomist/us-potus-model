@@ -20,7 +20,12 @@ library(urbnmapr)
 library(ggrepel)
 
 # copy/paste this code to console to run all models again and render this document:
-# source('scripts/R/Refactored/poll_backtest_2008.R');source('scripts/R/Refactored/poll_backtest_2012.R');source('scripts/R/Refactored/poll_run_v7.R');rmarkdown::render('model_summary.Rmd');beepr::beep(2);beepr::beep(2)
+
+# model version 12:
+# source('scripts/R/Backtesting/v7_2008.R');source('scripts/R/Backtesting/v7_2012.R');source('scripts/R/Refactored/poll_run_v7.R');rmarkdown::render('model_summary.Rmd');beepr::beep(2)
+
+# model version 13:
+# source('scripts/R/Backtesting/v8_2008.R');source('scripts/R/Backtesting/v8_2012.R');source('scripts/R/Refactored/poll_run_v8.R');rmarkdown::render('model_summary.Rmd');beepr::beep(2)
 ```
 
 ## Methodology
@@ -1311,7 +1316,7 @@ final_evs.2016.gg <-  ggplot(final_evs,aes(x=dem_ev,
     theme(legend.position = 'top',
           panel.grid.minor = element_blank()) +
     scale_fill_manual(name='Electoral College winner',values=c('Democratic'='#3A4EB1','Republican'='#E40A04')) +
-    labs(x='Democratic electoral college votes',title='2012, Potential Electoral College outcomes',
+    labs(x='Democratic electoral college votes',title='2016, Potential Electoral College outcomes',
          subtitle=sprintf("p(dem win) = %s | full stan model",round(mean(final_evs$dem_ev>=270),3)))
 
 

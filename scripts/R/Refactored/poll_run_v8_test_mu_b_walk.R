@@ -37,7 +37,7 @@ cov_matrix <- function(n, sigma2, rho){
 }
 
 ## Master variables
-RUN_DATE <- min(ymd('2016-09-01'),Sys.Date())
+RUN_DATE <- min(ymd('2016-11-08'),Sys.Date())
 
 election_day <- ymd("2016-11-08")
 start_date <- as.Date("2016-03-01") # Keeping all polls after March 1, 2016
@@ -368,13 +368,9 @@ model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v13.stan")
 for (i_mu_b_walk in 1:len_mu_b_walk_sd){
   output_list[[i_mu_b_walk]] <- list()
   output_list[[i_mu_b_walk]][["sd_val"]] <- mu_b_walk_sd[i_mu_b_walk]
-<<<<<<< HEAD
   state_correlation_mu_b_walk <- cov_matrix(51, (mu_b_walk_sd[i_mu_b_walk]^2) , 0.75) 
   state_correlation_mu_b_walk <- state_correlation_mu_b_walk * state_correlation
-=======
-  state_correlation_mu_b_walk <- cov_matrix(51, (mu_b_walk_sd[i_mu_b_walk]^2) / 7, 0.75) 
-  #state_correlation_mu_b_walk <- state_correlation_mu_b_walk * state_correlation
->>>>>>> f9d7faa3fda91a1ceef3e52122ff11f70ce7de63
+  
   
   
   # data ---
@@ -694,7 +690,9 @@ for (i_mu_b_walk in 1:len_mu_b_walk_sd){
   output_list[[i_mu_b_walk]][["brier"]] <- brier
 }
 
-write_rds(output_list, sprintf('models/output_mu_b_walk_test_n2_%s.rds',RUN_DATE),compress = 'gz')
+write_rds(output_list, sprintf('models/output_mu_b_walk_test_%s.rds',RUN_DATE),compress = 'gz')
+
+output_list <- read_rds(sprintf('models/output_mu_b_walk_test_%s.rds',RUN_DATE))
 
 output_list[[1]][["by_states"]]
 output_list[[4]][["by_states"]]

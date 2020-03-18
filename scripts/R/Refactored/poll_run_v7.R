@@ -124,7 +124,7 @@ state_data <- state_data %>%
 census <- read.csv('data/acs_2013_variables.csv')
 census <- census %>%
   filter(!is.na(state)) %>% 
-  select(-c(state_fips)) %>%
+  select(-c(state_fips,pop_total)) %>%
   group_by(state) %>%
   gather(variable,value,
          1:(ncol(.)-1))
@@ -147,7 +147,7 @@ state_data <- state_data %>%
 # test
 # plot(state_data$AL, state_data$MN)
 state_data %>% 
-  select(AL,CA,FL,MN,NC,NM,RI,WI) %>% 
+  select(NV,FL,WI,MI,NH,OH,IA,NC,IN) %>%  #AL,CA,FL,MN,NC,NM,RI,WI
   cor 
 
 # make matrices
@@ -156,7 +156,7 @@ state_correlation[state_correlation < 0] <- 0 # nothing should be negatively cor
 state_correlation <- make.positive.definite(state_correlation)
 
 #state_correlation_error <- state_correlation # covariance for backward walk
-state_correlation_error <- cov_matrix(51, 0.08^2, 1) # 0.08^2
+state_correlation_error <- cov_matrix(51, 0.1^2, 1) # 0.08^2
 state_correlation_error <- state_correlation_error * state_correlation
 
 #state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
@@ -206,7 +206,7 @@ all_t_until_election <- min(all_t) + days(0:(election_day - min(all_t)))
 # pollster indices
 all_pollsters <- levels(as.factor(as.character(df$pollster)))
 
-
+ 
 # Reading 2012 election data to --------- 
 # (1) get state_names and EV        
 # (2) set priors on mu_b and alpha,
@@ -288,12 +288,10 @@ score_among_polled <- sum(states2012[all_polled_states[-1],]$obama_count)/
 alpha_prior <- log(states2012$national_score[1]/score_among_polled)
 
 
-y <- MASS::mvrnorm(1000, mu_b_prior, Sigma = state_correlation_error)
+# checking the amounts of error in the correlation matrices
+y <- MASS::mvrnorm(10000, mu_b_prior, Sigma = state_correlation_error)
 
-cbind(
-  inv.logit(apply(y, MARGIN = 2, mean)),
-  inv.logit(apply(y, MARGIN = 2, mean) + 1.96 * apply(y, MARGIN = 2, sd)), 
-  inv.logit(apply(y, MARGIN = 2, mean) - 1.96 * apply(y, MARGIN = 2, sd)))
+mean( inv.logit(apply(y, MARGIN = 2, mean) +  apply(y, MARGIN = 2, sd)) - inv.logit(apply(y, MARGIN = 2, mean)) )
 
 
 # First stage predictions -------
@@ -316,7 +314,7 @@ data_1st <- list(
 # model
 m_1st <- rstan::stan_model("scripts/Stan/Refactored/poll_model_1st_stage_v1.stan")
 # run
-out <- rstan::sampling(m_1st, data = data_1st, iter = 2000,warmup=500, chains = 2)
+out <- rstan::sampling(m_1st, data = data_1st, iter = 1000,warmup=500, chains = 2)
 # extract
 yrep_two_share <- as.integer(apply(rstan::extract(out, pars = "yrep")[[1]], MARGIN = 2, median))
 
@@ -418,7 +416,7 @@ model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v12.stan")
 # run model
 out <- rstan::sampling(model, data = data,
                        refresh=50,
-                       chains = 2, iter = 2000, warmup=500, init = init_ll
+                       chains = 2, iter = 1000, warmup=500, init = init_ll
 )
 
 
@@ -426,14 +424,11 @@ out <- rstan::sampling(model, data = data,
 write_rds(out, sprintf('models/stan_model_%s.rds',RUN_DATE),compress = 'gz')
 
 ### Extract results ----
-#out <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
+# out <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
 
 # etc
 a <- rstan::extract(out, pars = "alpha")[[1]]
 hist(a)
-# delta
-delta <- rstan::extract(out, pars = "delta")[[1]]
-hist(delta)
 # sigmas
 tibble(sigma_national = rstan::extract(out, pars = "sigma_a")[[1]],
        sigma_state = rstan::extract(out, pars = "sigma_b")[[1]]) %>%

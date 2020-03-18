@@ -124,7 +124,7 @@ state_data <- state_data %>%
 census <- read.csv('data/acs_2013_variables.csv')
 census <- census %>%
   filter(!is.na(state)) %>% 
-  select(-c(state_fips)) %>%
+  select(-c(state_fips,pop_total)) %>%
   group_by(state) %>%
   gather(variable,value,
          1:(ncol(.)-1))
@@ -156,7 +156,7 @@ state_correlation[state_correlation < 0] <- 0 # nothing should be negatively cor
 state_correlation <- make.positive.definite(state_correlation)
 
 #state_correlation_error <- state_correlation # covariance for backward walk
-state_correlation_error <- cov_matrix(51, 0.08^2, 1) # 0.08^2
+state_correlation_error <- cov_matrix(51, 0.08^2, 0.9) # 0.08^2
 state_correlation_error <- state_correlation_error * state_correlation
 
 #state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
