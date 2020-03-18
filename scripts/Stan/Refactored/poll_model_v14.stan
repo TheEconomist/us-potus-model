@@ -18,8 +18,6 @@ data{
   int n_two_share_state[N_state];
   vector[S] pred_two_share_state_mu;
   vector[S] pred_two_share_state_sigma;
-  vector<lower = 0, upper = 1.0>[N_national] adjusted_national;
-  vector<lower = 0, upper = 1.0>[N_state] adjusted_state;
   // forward-backward
   int<lower = 1, upper = T> current_T;
   matrix[S, S] ss_corr_mu_b_walk;
@@ -33,8 +31,6 @@ data{
   vector[S] mu_b_prior; 
   // mu_c
   real<lower = 0> prior_sigma_c;
-  // mu_d
-  real<lower = 0> prior_sigma_d;
   // alpha
   real mu_alpha;    
   real sigma_alpha; 
@@ -64,9 +60,6 @@ parameters {
   // mu_c
   real<lower = 0> raw_sigma_c;
   vector[P] raw_mu_c;
-  // mu_d
-  real<lower = 0> raw_sigma_d;
-  vector[current_T] raw_mu_d;
   // u = measurement noise
   real <lower = 0> raw_sigma_measure_noise_state;
   real <lower = 0> raw_sigma_measure_noise_national;
@@ -92,9 +85,6 @@ transformed parameters {
   // mu_c
   real sigma_c;
   vector[P] mu_c;
-  // mu_d
-  real sigma_d;
-  vector[current_T] mu_d;
   // u
   real sigma_measure_noise_national;
   real sigma_measure_noise_state;
@@ -127,10 +117,6 @@ transformed parameters {
   // mu_c
   sigma_c = raw_sigma_c * prior_sigma_c;
   mu_c = raw_mu_c * sigma_c;
-  // mu_d
-  sigma_d = raw_sigma_d * prior_sigma_d;
-  mu_d[current_T] = 0;
-  for (t in 1:(current_T - 1)) mu_d[current_T - t] = mu_d[current_T - t + 1] + raw_mu_d[current_T - t + 1] * sigma_d;
   // u
   sigma_measure_noise_national = raw_sigma_measure_noise_national * prior_sigma_measure_noise;
   sigma_measure_noise_state = raw_sigma_measure_noise_state * prior_sigma_measure_noise;
@@ -141,13 +127,11 @@ transformed parameters {
   eta = raw_eta * prior_sigma_eta;
   //*** fill pi_democrat
   // state
-  for (i in 1:N_state){
-    logit_pi_democrat_state[i] = mu_a[day_state[i]] + mu_b[state[i], day_state[i]] + mu_c[poll_state[i]] + 
-      adjusted_state[i] * mu_d[day_state[i]] +
-      measure_noise_state[i] * sigma_measure_noise_state + polling_error[state[i]] + eta * delta_state[state[i]];
+  logit_pi_democrat_state = mu_a[day_state] + mu_b[state , day_state] + mu_c[poll_state] + 
+      measure_noise_state * sigma_measure_noise_state + polling_error[state] + eta * delta_state[state];
   }
   // national
-  logit_pi_democrat_national = mu_a[day_national] + alpha + mu_c[poll_national] + adjusted_national .* mu_d[day_national] +
+  logit_pi_democrat_national = mu_a[day_national] + alpha + mu_c[poll_national] + 
       measure_noise_national * sigma_measure_noise_national + eta * delta_national;
 }
 model {
@@ -164,9 +148,6 @@ model {
   // mu_c
   raw_sigma_c ~ std_normal();
   raw_mu_c ~ std_normal();
-  // mu_d
-  raw_sigma_d ~ std_normal();
-  raw_mu_d ~ std_normal();
   // measurement noise
   raw_sigma_measure_noise_state ~ std_normal();
   raw_sigma_measure_noise_national ~ std_normal();

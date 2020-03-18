@@ -424,7 +424,7 @@ out <- rstan::sampling(model, data = data,
 write_rds(out, sprintf('models/stan_model_%s.rds',RUN_DATE),compress = 'gz')
 
 ### Extract results ----
-# out <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
+out <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
 
 # etc
 a <- rstan::extract(out, pars = "alpha")[[1]]

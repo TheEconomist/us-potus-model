@@ -257,6 +257,17 @@ cbind(
   inv.logit(apply(y, MARGIN = 2, mean) - 1.96 * apply(y, MARGIN = 2, sd)))
 
 
+## adjusts
+adjusters <- c("ABC News/Washington Post",
+  'IBD/TIPP',
+  'Ipsos',
+  'Pew Research Center',
+  'YouGov',
+  'Civiqs',
+  'NBC/WSJ')
+
+
+
 # First stage predictions -------
 N <- nrow(df)
 S <- 51
@@ -299,20 +310,21 @@ n_democrat_national <- df %>% filter(index_s == 52) %>% pull(n_clinton)
 n_democrat_state <- df %>% filter(index_s != 52) %>% pull(n_clinton)
 n_two_share_national <- df %>% filter(index_s == 52) %>% transmute(n_two_share = n_trump + n_clinton) %>% pull(n_two_share)
 n_two_share_state <- df %>% filter(index_s != 52) %>% transmute(n_two_share = n_trump + n_clinton) %>% pull(n_two_share)
-#n_respondents <- df$n_clinton + df$n_trump
 pred_two_share_national_mu    <- two_share_mu[52]
 pred_two_share_state_mu       <- two_share_mu[1:51]
 pred_two_share_national_sigma <- two_share_sd[52]
 pred_two_share_state_sigma    <- two_share_sd[1:51]
+adjusted_national <- df %>% mutate(adjusted = ifelse(!(pollster %in% adjusters), 1, 0)) %>% filter(index_s == 52) %>% pull(adjusted)
+adjusted_state <- df %>% mutate(adjusted = ifelse(!(pollster %in% adjusters), 1, 0)) %>% filter(index_s != 52) %>% pull(adjusted)
 
-
-
+                                   
 # priors ---
 prior_sigma_measure_noise <- 0.01 ### 0.1 / 2
 prior_sigma_a <- 0.03 ### 0.05 / 2
 prior_sigma_b <- 0.04 ### 0.05 / 2
 mu_b_prior <- mu_b_prior
 prior_sigma_c <- 0.02 ### 0.1 / 2
+prior_sigma_d <- 0.03
 mu_alpha <- alpha_prior
 sigma_alpha <- 0.2  ### 0.2
 prior_sigma_eta <- 0.2
@@ -337,6 +349,8 @@ data <- list(
   pred_two_share_state_mu = pred_two_share_state_mu,
   pred_two_share_national_sigma = pred_two_share_national_sigma,
   pred_two_share_state_sigma = pred_two_share_state_sigma,
+  adjusted_national = adjusted_national,
+  adjusted_state = adjusted_state,
   current_T = as.integer(current_T),
   ss_correlation = state_correlation,
   ss_corr_mu_b_T = state_correlation_mu_b_T,
@@ -347,6 +361,7 @@ data <- list(
   prior_sigma_b = prior_sigma_b,
   mu_b_prior = mu_b_prior,
   prior_sigma_c = prior_sigma_c,
+  prior_sigma_d = prior_sigma_d,
   mu_alpha = mu_alpha,
   sigma_alpha = sigma_alpha,
   prior_sigma_eta = prior_sigma_eta
@@ -367,9 +382,10 @@ initf2 <- function(chain_id = 1) {
        raw_polling_error = abs(rnorm(S)),
        sigma_measure_noise_national = abs(rnorm(1, 0, prior_sigma_measure_noise)),
        sigma_measure_noise_state = abs(rnorm(1, 0, prior_sigma_measure_noise)),
-       sigma_mu_c = abs(rnorm(1, 0, prior_sigma_c)),
        sigma_mu_a = abs(rnorm(1, 0, prior_sigma_a)),
-       sigma_mu_b = abs(rnorm(1, 0, prior_sigma_b))
+       sigma_mu_b = abs(rnorm(1, 0, prior_sigma_b)),
+       sigma_mu_c = abs(rnorm(1, 0, prior_sigma_c)),
+       sigma_mu_d = abs(rnorm(1, 0, prior_sigma_d))
   )
 }
 
@@ -381,7 +397,7 @@ init_ll <- lapply(1:n_chains, function(id) initf2(chain_id = id))
 
 # read model code
 # model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v10.stan")
-model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v13.stan")
+model <- rstan::stan_model("scripts/Stan/Adjusted_v_unadjusted/poll_model_adj_v_nadj_v1.stan")
 
 # run model
 out <- rstan::sampling(model, data = data,
