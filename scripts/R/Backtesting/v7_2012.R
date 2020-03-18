@@ -245,7 +245,7 @@ abramowitz <- read.csv('data/abramowitz_data.csv') %>%
 
 # train a caret model to predict demvote with incvote ~ q2gdp + juneapp + year:q2gdp + year:juneapp 
 prior_model <- caret::train(
-  incvote ~  juneapp + q2gdp, #+ year:q2gdp + year:juneapp
+  incvote ~ juneapp,
   data = abramowitz,
   method = "glm",
   trControl = trainControl(
