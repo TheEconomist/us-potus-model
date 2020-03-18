@@ -18,6 +18,7 @@ library(boot)
 library(pbapply)
 library(urbnmapr)
 library(ggrepel)
+library(DT)
 
 # copy/paste this code to console to run all models again and render this document:
 
@@ -458,7 +459,6 @@ final_evs.2008.gg <-  ggplot(final_evs,aes(x=dem_ev,
 
 ```
 
-
 #### Map
 
 ```{r echo=F,message=F,warning=F}
@@ -499,6 +499,22 @@ predictcompare.2008.gg
 knitr::kable(briers.2008)
 ```
 
+#### Predictions for each state
+
+```{r echo=F,message=F,warning=F}
+p_obama %>% 
+  filter(t == max(t)) %>% 
+  mutate(se = (high - mean)/2) %>%
+  mutate(high = round(high,3),
+         low = round(low,3),
+         mean = round(mean,3),
+         prob = round(prob,3),
+         se = round(se,3)) %>%
+  select(state,mean,low,high,prob,se) %>%
+  arrange(abs(mean-0.5)) %>%
+  datatable()
+            
+```
 
 ### 2012 
 
@@ -933,6 +949,23 @@ knitr::kable(briers.2012)
 ```
 
 
+#### Predictions for each state
+
+```{r echo=F,message=F,warning=F}
+p_obama %>% 
+  filter(t == max(t)) %>% 
+  mutate(se = (high - mean)/2) %>%
+  mutate(high = round(high,3),
+         low = round(low,3),
+         mean = round(mean,3),
+         prob = round(prob,3),
+         se = round(se,3)) %>%
+  select(state,mean,low,high,prob,se) %>%
+  arrange(abs(mean-0.5)) %>%
+  datatable()
+            
+```
+
 ### 2016
 
 ```{r include=F}
@@ -1134,8 +1167,6 @@ p_clinton <- p_clinton %>%
       mutate(state='--')
   )
 
-# look
-p_clinton %>% filter(t == max(t),state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/2)
 
 map.2016.gg <- urbnmapr::states %>%
   left_join(p_clinton %>% filter(t == max(t)) %>%
@@ -1363,4 +1394,20 @@ predictcompare.2016.gg
 knitr::kable(briers.2016)
 ```
 
+#### Predictions for each state
+
+```{r echo=F,message=F,warning=F}
+p_clinton %>% 
+  filter(t == max(t)) %>% 
+  mutate(se = (high - mean)/2) %>%
+  mutate(high = round(high,3),
+         low = round(low,3),
+         mean = round(mean,3),
+         prob = round(prob,3),
+         se = round(se,3)) %>%
+  select(state,mean,low,high,prob,se) %>%
+  arrange(abs(mean-0.5)) %>%
+  datatable()
+            
+```
 

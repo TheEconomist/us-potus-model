@@ -149,7 +149,7 @@ state_correlation[state_correlation < 0] <- 0 # nothing should be negatively cor
 state_correlation <- make.positive.definite(state_correlation)
 
 #state_correlation_error <- state_correlation # covariance for backward walk
-state_correlation_error <- cov_matrix(51, 0.1^2, 1) # 0.08^2
+state_correlation_error <- cov_matrix(51, 0.08^2, 1) # 0.08^2
 state_correlation_error <- state_correlation_error * state_correlation
 
 #state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
@@ -306,7 +306,7 @@ data_1st <- list(
 # model
 m_1st <- rstan::stan_model("scripts/Stan/Refactored/poll_model_1st_stage_v1.stan")
 # run
-out <- rstan::sampling(m_1st, data = data_1st, iter = 1000,warmup=500, chains = 2)
+out <- rstan::sampling(m_1st, data = data_1st, iter = 2000,warmup=500, chains = 2)
 # extract
 yrep_two_share <- as.integer(apply(rstan::extract(out, pars = "yrep")[[1]], MARGIN = 2, median))
 
@@ -408,7 +408,7 @@ model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v12.stan")
 # run model
 out <- rstan::sampling(model, data = data,
                        refresh=50,
-                       chains = 2, iter = 1000, warmup=500, init = init_ll
+                       chains = 2, iter = 2000, warmup=500, init = init_ll
 )
 
 
