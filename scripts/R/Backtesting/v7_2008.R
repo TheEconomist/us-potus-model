@@ -149,16 +149,17 @@ state_correlation[state_correlation < 0] <- 0 # nothing should be negatively cor
 state_correlation <- make.positive.definite(state_correlation)
 
 #state_correlation_error <- state_correlation # covariance for backward walk
-state_correlation_error <- cov_matrix(51, 0.08^2, 1) # 0.08^2
+state_correlation_error <- cov_matrix(51, 0.1^2, 1) # 0.08^2
 state_correlation_error <- state_correlation_error * state_correlation
 
 #state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
-state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.09, rho = 0.5) #1/20
+state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.05, rho = 0.5) #1/20
 state_correlation_mu_b_T <- state_correlation_mu_b_T * state_correlation
 
 # state_correlation_mu_b_walk <- state_correlation
 state_correlation_mu_b_walk <- cov_matrix(51, (0.015)^2, 0.75) 
 state_correlation_mu_b_walk <- state_correlation_mu_b_walk * state_correlation
+
 
 
 # final poll wrangling ----
@@ -237,32 +238,24 @@ names(ev_state) <- states2008$state
 ##### Creating priors --------------
 # read in abramowitz data
 #setwd(here("data/"))
-abramowitz <- read.csv('data/abramowitz_data.csv') %>% filter(year < 2008)
+abramowitz <- read.csv('data/abramowitz_data.csv') %>% 
+  filter(year < 2008)
 
 # train a caret model to predict demvote with incvote ~ q2gdp + juneapp + year:q2gdp + year:juneapp 
-prior_model <- caret::train(
-  incvote ~ juneapp , #+ year:q2gdp + year:juneapp
-  data = abramowitz,
-  method = "glm",
-  trControl = trainControl(
-    method = "LOOCV"),
-  tuneLength = 50)
-# find the optimal parameters
-best = which(rownames(prior_model$results) == rownames(prior_model$bestTune))
-best_result = prior_model$results[best, ]
-rownames(best_result) = NULL
-best_result
+prior_model <- lm(
+  incvote ~  juneapp + q2gdp, #+ year:q2gdp + year:juneapp
+  data = abramowitz
+)
 
 # make predictions
-national_mu_prior <- predict(prior_model,newdata = tibble(q2gdp = 1.3, juneapp = -40	))
-# reverse when a rep is the incumbent
-national_mu_prior <- 100 - national_mu_prior
-#national_mu_prior <- 51.1
+national_mu_prior <- 100 - predict(prior_model,newdata = tibble(q2gdp = 0.6,
+                                                          juneapp = -40,
+                                                          year = 2016))
 cat(sprintf('Prior Obama two-party vote is %s\nWith a standard error of %s',
-            round(national_mu_prior/100,3),round(best_result$RMSE/100,3)))
+            round(national_mu_prior/100,3),0.05))
+
 # on correct scale
 national_mu_prior <- national_mu_prior / 100
-
 
 # Mean of the mu_b_prior
 # 0.486 is the predicted obama share of the national vote according to the Lewis-Beck & Tien model

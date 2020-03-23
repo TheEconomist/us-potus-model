@@ -119,7 +119,7 @@ polls_2012 <- polls_2012 %>%
 state_correlation <- cor(polls_2012)  
 
 #state_correlation_error <- state_correlation # covariance for backward walk
-state_correlation_error <- cov_matrix(51, 0.1^2, .8) # 0.08^2
+state_correlation_error <- cov_matrix(51, 0.08^2, .8) # 0.08^2
 state_correlation_error <- state_correlation_error * state_correlation
 
 #state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
@@ -258,13 +258,12 @@ cbind(
 
 
 ## adjusts
-adjusters <- c("ABC News/Washington Post",
-  'IBD/TIPP',
+adjusters <- c("ABC",
   'Ipsos',
-  'Pew Research Center',
+  'Pew',
   'YouGov',
   'Civiqs',
-  'NBC/WSJ')
+  'NBC')
 
 
 
@@ -319,7 +318,7 @@ adjusted_state <- df %>% mutate(adjusted = ifelse(!(pollster %in% adjusters), 1,
 
                                    
 # priors ---
-prior_sigma_measure_noise <- 0.01 ### 0.1 / 2
+prior_sigma_measure_noise <- 0.005 ### 0.1 / 2
 prior_sigma_a <- 0.03 ### 0.05 / 2
 prior_sigma_b <- 0.04 ### 0.05 / 2
 mu_b_prior <- mu_b_prior
@@ -458,7 +457,7 @@ p_clinton <- p_clinton %>%
   )
 
 # look
-p_clinton %>% filter(t == max(t),state %in% ex_states) %>% mutate(se = (high - mean)/2)
+p_clinton %>% filter(t == max(t),state %in% c('--',ex_states)) %>% mutate(se = (high - mean)/2)
 
 
 # electoral college by simulation

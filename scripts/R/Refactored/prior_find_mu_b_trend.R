@@ -38,13 +38,16 @@ abramowitz <- read.csv('data/abramowitz_data.csv') %>%
   left_join(read_csv('data/ANES_swing_voters.csv')) %>%
   filter(!is.na(ANES_share_swing_voters))
 
-# train a caret model to predict demvote with incvote ~ q2gdp + juneapp + year:q2gdp + year:juneapp 
+# just a simple linear model
 prior_model <- lm(incvote ~ 
-                    juneapp*ANES_share_swing_voters, 
+                    juneapp + q2gdp, 
                   data = abramowitz)
 
 national_preds = tibble(year = abramowitz$year,
-                        pred_two_party_national = fitted(prior_model)/100)
+                        pred_two_party_national = fitted(prior_model)/100) %>%
+  mutate(pred_two_party_national = ifelse(year %in% c(1976,1984,1988,1992,2004,2008),
+                                          1-pred_two_party_national,
+                                          pred_two_party_national))
 
 # add to national, generate predictions
 results <- results %>%
@@ -53,7 +56,37 @@ results <- results %>%
   )
 
 rmse(results$dem_share_vote_year_prediction  -  results$dem_two_party_share)
+mean(abs(results$dem_share_vote_year_prediction  -  results$dem_two_party_share),na.rm=T)
+rmse(results$pred_two_party_national  -  results$national_dem_two_party_share)
 
+# what is it out-of-sample?
+helout_preds <- lapply(abramowitz$year,
+       function(x){
+         mod <- lm(incvote ~ q2gdp + juneapp,
+                           data = abramowitz[abramowitz$year != x,])
+         
+         tmp_preds = abramowitz %>%
+           filter(year == x) %>%
+           mutate(year = x,
+                  pred_two_party_national = predict(mod,.)/100)
+         
+         # gen predictions
+         helout_preds <- results %>%
+           select(-c(pred_two_party_national,dem_share_vote_year_prediction)) %>%
+           filter(year == x) %>%
+           left_join(tmp_preds) %>%
+           mutate(pred_two_party_national = ifelse(year %in% c(1976,1984,1988,1992,2004,2008),
+                                                   1-pred_two_party_national,
+                                                   pred_two_party_national)) %>%
+           mutate(dem_share_vote_year_prediction = dem_two_party_share_lean_lag + pred_two_party_national)
+         
+       }) %>%
+  do.call('rbind',.)
+
+
+rmse(helout_preds$dem_share_vote_year_prediction  -  helout_preds$dem_two_party_share)
+mean(abs(helout_preds$dem_share_vote_year_prediction  -  helout_preds$dem_two_party_share),na.rm=T)
+rmse(helout_preds$pred_two_party_national  -  helout_preds$demvote/100)
 
 
 # fit national model ------------------------------------------------------
@@ -64,47 +97,44 @@ abramowitz <- read.csv('data/abramowitz_data.csv')  %>%
 # train a caret model to predict demvote with incvote ~ q2gdp + juneapp + swing voters
 # use a bunch of different regularization methods and combine them
 model_list  <- c(
-  "glmnet","brnn","blassoAveraged",
-  "lars2","penalized","rqlasso","relaxo",
-  "blasso","bridge"
-  )
+  # regularization (Bayes and not)
+  "glmnet","blassoAveraged",
+  "rqlasso","blasso","bridge",'bayesglm',
+  # lm and support vector lm
+  'lm','svmLinear'
+  # extreme gradient boosting
+  #'xgbLinear' #'xgbTree','xgbDART'
+)
 
 prior_model <- caretList(
-  incvote ~ q2gdp*juneapp + q2gdp:ANES_share_swing_voters + juneapp:ANES_share_swing_voters,
+  incvote ~ q2gdp + juneapp + q2gdp*ANES_share_swing_voters + juneapp*ANES_share_swing_voters,
   data = abramowitz,
-  #method = "glmboost",
-  methodList = model_list, 
+  methodList = model_list,
   metric = "RMSE",
   trControl = trainControl(
-    #method = "LOOCV",
-    method = "repeatedcv", number = 7, repeats = 10, savePredictions = 'final',
-    allowParallel = T,verboseIter = T),
-  tuneLength = 10)
+    method = "repeatedcv", number = 5, repeats = 10, savePredictions = 'final',
+    allowParallel = FALSE,verboseIter = FALSE),
+  tuneLength = 10
+)
 
+  
 # combine into one regularized ensemble learner
-stack <- caretStack(prior_model, 
-                    method = "glmboost",
+stack <- caretEnsemble(prior_model, 
+                    #method = "ranger",
                     metric = "RMSE",
                     trControl = trainControl(
-                      method = "repeatedcv", number = 7, repeats = 10, savePredictions = 'final',
-                      allowParallel = T,verboseIter = T),
+                      method = "cv", number = 5, savePredictions = 'final',
+                      allowParallel = TRUE,verboseIter = FALSE),
                     tuneLength = 10)
 
 stack
 
-# find the optimal parameters
-# best = which(rownames(prior_model$results) == rownames(prior_model$bestTune))
-# best_result = prior_model$results[best, ]
-# rownames(best_result) = NULL
-# best_result
-# 
-# coef(prior_model$finalModel)#,best_result$lambda)
 
 # make predictions
 NATIONAL_PRIOR_INCUMBENT_TWO_PARTY_SHARE <- predict(stack,
                                                     newdata = tibble(q2gdp = 1,
                                                                      juneapp = -10,
-                                                                     ANES_share_swing_voters = 0.05)) / 100
+                                                                     ANES_share_swing_voters = 0.1)) / 100
 
 # negate when a rep is president
 NATIONAL_PRIOR_DEM_TWO_PARTY_SHARE <- 1 - NATIONAL_PRIOR_INCUMBENT_TWO_PARTY_SHARE
