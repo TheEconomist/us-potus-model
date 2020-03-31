@@ -133,6 +133,21 @@ state_data <- state_data %>%
   mutate(variable = as.character(variable)) %>%
   bind_rows(census)
 
+# add region, as a dummy for each region
+regions <- read_csv('data/state_region_crosswalk.csv') %>%
+  select(state = state_abb, variable=region) %>%
+  mutate(value = 1) %>%
+  spread(variable,value)
+
+regions[is.na(regions)] <- 0
+
+regions <- regions %>%
+  gather(variable,value,2:ncol(.))
+  
+# state_data <- state_data %>% 
+#   bind_rows(regions)
+
+# scale and spread
 state_data <- state_data %>%
   group_by(variable) %>%
   # scale all varaibles
@@ -145,7 +160,7 @@ state_data <- state_data %>%
   select(-variable)
 
 # test
-# plot(state_data$AL, state_data$MN)
+#plot(state_data$MN, state_data$WI)
 state_data %>% 
   select(NV,FL,WI,MI,NH,OH,IA,NC,IN) %>%  #AL,CA,FL,MN,NC,NM,RI,WI
   cor 
@@ -156,11 +171,11 @@ state_correlation[state_correlation < 0] <- 0 # nothing should be negatively cor
 state_correlation <- make.positive.definite(state_correlation)
 
 #state_correlation_error <- state_correlation # covariance for backward walk
-state_correlation_error <- cov_matrix(51, 0.1^2, 1) # 0.08^2
+state_correlation_error <- cov_matrix(51, 0.1^2, 0.9) # 0.08^2
 state_correlation_error <- state_correlation_error * state_correlation
 
 #state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
-state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.05, rho = 0.5) #1/20
+state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.07, rho = 0.5) #1/20
 state_correlation_mu_b_T <- state_correlation_mu_b_T * state_correlation
 
 # state_correlation_mu_b_walk <- state_correlation
@@ -305,7 +320,7 @@ data_1st <- list(
 # model
 m_1st <- rstan::stan_model("scripts/Stan/Refactored/poll_model_1st_stage_v1.stan")
 # run
-out <- rstan::sampling(m_1st, data = data_1st, iter = 2000,warmup=500, chains = 2)
+out <- rstan::sampling(m_1st, data = data_1st, iter = 1000,warmup=500, chains = 2)
 # extract
 yrep_two_share <- as.integer(apply(rstan::extract(out, pars = "yrep")[[1]], MARGIN = 2, median))
 
@@ -407,7 +422,7 @@ model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v12.stan")
 # run model
 out <- rstan::sampling(model, data = data,
                        refresh=50,
-                       chains = 2, iter = 2000, warmup=500, init = init_ll
+                       chains = 2, iter = 1000, warmup=500, init = init_ll
 )
 
 

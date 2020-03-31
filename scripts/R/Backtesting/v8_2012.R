@@ -299,7 +299,7 @@ data_1st <- list(
 # model
 m_1st <- rstan::stan_model("scripts/Stan/Refactored/poll_model_1st_stage_v3.stan")
 # run
-out <- rstan::sampling(m_1st, data = data_1st, iter = 2000,warmup=500, chains = 2)
+out <- rstan::sampling(m_1st, data = data_1st, iter = 1000,warmup=500, chains = 2)
 # extract
 two_share_mu <- apply(rstan::extract(out, pars = "two_parties_mu")[[1]], MARGIN = 2, mean)
 two_share_sd <- apply(rstan::extract(out, pars = "two_parties_sd")[[1]], MARGIN = 2, mean)
@@ -330,7 +330,7 @@ pred_two_share_state_sigma    <- two_share_sd[1:51]
 
 
 # priors ---
-prior_sigma_measure_noise <- 0.01 ### 0.1 / 2
+prior_sigma_measure_noise <- 0.005 ### 0.1 / 2
 prior_sigma_a <- 0.03 ### 0.05 / 2
 prior_sigma_b <- 0.04 ### 0.05 / 2
 mu_b_prior <- mu_b_prior
@@ -408,7 +408,7 @@ model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v13.stan")
 # run model
 out <- rstan::sampling(model, data = data,
                        refresh=50,
-                       chains = 2, iter = 2000, warmup=500, init = init_ll
+                       chains = 2, iter = 1000, warmup=500, init = init_ll
 )
 
 
