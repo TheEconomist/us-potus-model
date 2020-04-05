@@ -27,6 +27,9 @@ library(DT)
 
 # model version 13:
 # source('scripts/R/Backtesting/v8_2008.R');source('scripts/R/Backtesting/v8_2012.R');source('scripts/R/Refactored/poll_run_v8.R');rmarkdown::render('model_summary.Rmd');beepr::beep(2)
+
+# model version final:
+# source('scripts/R/Backtesting/final_2008.R');source('scripts/R/Backtesting/final_2012.R');source('scripts/model/poll_model_2020.R');rmarkdown::render('model_summary.Rmd');beepr::beep(2)
 ```
 
 ## Methodology
@@ -206,8 +209,8 @@ names(state_weights) <- c(state_elec_results$state)
 ev_state <- state_elec_results$ev
 names(ev_state) <- state_elec_results$state
 
-# makes priors
-national_mu_prior <- 0.562
+# hard code prior
+national_mu_prior <- 0.566
 
 # Mean of the mu_b_prior
 mu_b_prior <- logit(national_mu_prior + prior_diff_score)
@@ -649,7 +652,7 @@ ev_state <- state_elec_results$ev
 names(ev_state) <- state_elec_results$state
 
 # makes priors
-national_mu_prior <- 0.51
+national_mu_prior <- 0.502
 
 # Mean of the mu_b_prior
 mu_b_prior <- logit(national_mu_prior + prior_diff_score)
@@ -1099,7 +1102,7 @@ ev_state <- state_elec_results$ev
 names(ev_state) <- state_elec_results$state
 
 # makes priors
-national_mu_prior <- 0.511
+national_mu_prior <- 0.506
 
 # Mean of the mu_b_prior
 mu_b_prior <- logit(national_mu_prior + prior_diff_score)

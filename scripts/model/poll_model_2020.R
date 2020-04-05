@@ -112,18 +112,70 @@ df <- df %>%
 # create correlation matrix ---------------------------------------------
 
 #here("data")
-polls_2012 <- read.csv("data/potus_results_76_16.csv")
-polls_2012 <- polls_2012 %>% 
+state_data <- read.csv("data/potus_results_76_16.csv")
+state_data <- state_data %>% 
   select(year, state, dem) %>%
-  spread(state, dem) %>% select(-year)
-state_correlation <- cor(polls_2012)  
+  group_by(state) %>%
+  mutate(dem = dem - lag(dem)) %>%
+  select(state,variable=year,value=dem)  %>%
+  ungroup() %>%
+  na.omit()
+
+census <- read.csv('data/acs_2013_variables.csv')
+census <- census %>%
+  filter(!is.na(state)) %>% 
+  select(-c(state_fips,pop_total)) %>%
+  group_by(state) %>%
+  gather(variable,value,
+         1:(ncol(.)-1))
+
+state_data <- state_data %>%
+  mutate(variable = as.character(variable)) %>%
+  bind_rows(census)
+
+# add region, as a dummy for each region
+regions <- read_csv('data/state_region_crosswalk.csv') %>%
+  select(state = state_abb, variable=region) %>%
+  mutate(value = 1) %>%
+  spread(variable,value)
+
+regions[is.na(regions)] <- 0
+
+regions <- regions %>%
+  gather(variable,value,2:ncol(.))
+
+#state_data <- state_data %>%
+  #bind_rows(regions)
+
+# scale and spread
+state_data <- state_data %>%
+  group_by(variable) %>%
+  # scale all varaibles
+  mutate(value = (value - min(value, na.rm=T)) / 
+           (max(value, na.rm=T) - min(value, na.rm=T))) %>%
+  # now spread
+  spread(state, value) %>% 
+  na.omit() %>%
+  ungroup() %>%
+  select(-variable)
+
+# test
+#plot(state_data$MN, state_data$WI)
+state_data %>% 
+  select(NV,FL,WI,MI,NH,OH,IA,NC,IN) %>%  #AL,CA,FL,MN,NC,NM,RI,WI
+  cor 
+
+# make matrices
+state_correlation <- cor(state_data)  
+state_correlation[state_correlation < 0] <- 0 # nothing should be negatively correlated
+state_correlation <- make.positive.definite(state_correlation)
 
 #state_correlation_error <- state_correlation # covariance for backward walk
-state_correlation_error <- cov_matrix(51, 0.1^2, .8) # 0.08^2
+state_correlation_error <- cov_matrix(51, 0.1^2, 0.8) # 0.08^2
 state_correlation_error <- state_correlation_error * state_correlation
 
 #state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
-state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.09, rho = 0.5) #1/20
+state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.07, rho = 0.5) #1/20
 state_correlation_mu_b_T <- state_correlation_mu_b_T * state_correlation
 
 # state_correlation_mu_b_walk <- state_correlation
@@ -205,38 +257,43 @@ names(ev_state) <- states2012$state
 ##### Creating priors --------------
 # read in abramowitz data
 #setwd(here("data/"))
-abramowitz <- read.csv('data/abramowitz_data.csv') %>% filter(year != 2016)
+abramowitz <- read.csv('data/abramowitz_data.csv') %>% 
+  filter(year < 2016)
 
-# train a caret model to predict demvote 
-prior_model <- caret::train(
-  incvote ~  juneapp , #+ year:q2gdp + year:juneapp
-  data = abramowitz,
-  #method = "glmnet",
-  trControl = trainControl(
-    method = "LOOCV"),
-  tuneLength = 50)
-
-# find the optimal parameters
-best = which(rownames(prior_model$results) == rownames(prior_model$bestTune))
-best_result = prior_model$results[best, ]
-rownames(best_result) = NULL
-best_result
+# train a caret model to predict demvote with incvote ~ q2gdp + juneapp + year:q2gdp + year:juneapp 
+prior_model <- lm(
+  incvote ~  juneapp + q2gdp, #+ year:q2gdp + year:juneapp
+  data = abramowitz
+)
 
 # make predictions
 national_mu_prior <- predict(prior_model,newdata = tibble(q2gdp = 1.1,
-                                                          juneapp = 4,
-                                                          year = 2016))
+                                                                juneapp = 4))
+
 cat(sprintf('Prior Clinton two-party vote is %s\nWith a standard error of %s',
-            round(national_mu_prior/100,3),round(best_result$RMSE/100,3)))
+            round(national_mu_prior/100,3),0.05))
 
 # on correct scale
 national_mu_prior <- national_mu_prior / 100
-national_sigma_prior <- best_result$RMSE / 100
 
 # Mean of the mu_b_prior
 # 0.486 is the predicted Clinton share of the national vote according to the Lewis-Beck & Tien model
 # https://pollyvote.com/en/components/econometric-models/lewis-beck-tien/
 mu_b_prior <- logit(national_mu_prior + prior_diff_score)
+
+# or read in priors if generated already
+prior_in <- read_csv("data/state_priors_08_12_16.csv") %>%
+  filter(date <= RUN_DATE) %>%
+  group_by(state) %>%
+  arrange(date) %>%
+  filter(date == max(date)) %>%
+  select(state,pred) %>%
+  ungroup() %>%
+  arrange(state)
+  
+mu_b_prior <- logit(prior_in$pred)
+names(mu_b_prior) <- prior_in$state
+names(mu_b_prior) == names(prior_diff_score) # correct order?
 
 # The model uses national polls to complement state polls when estimating the national term mu_a.
 # One problem until early September, was that voters in polled states were different from average voters :
@@ -319,7 +376,7 @@ unadjusted_state <- df %>% mutate(unadjusted = ifelse(!(pollster %in% adjusters)
 
                                    
 # priors ---
-prior_sigma_measure_noise <- 0.01 ### 0.1 / 2
+prior_sigma_measure_noise <- 0.005 ### 0.1 / 2
 prior_sigma_a <- 0.03 ### 0.05 / 2
 prior_sigma_b <- 0.04 ### 0.05 / 2
 mu_b_prior <- mu_b_prior
@@ -397,8 +454,8 @@ init_ll <- lapply(1:n_chains, function(id) initf2(chain_id = id))
 #setwd(here("scripts/Stan/Refactored/"))
 
 # read model code
-# model <- rstan::stan_model("scripts/Stan/Refactored/poll_model_v10.stan")
-model <- rstan::stan_model("scripts/Stan/Adjusted_v_unadjusted/poll_model_adj_v_nadj_v2.stan")
+#model <- rstan::stan_model("scripts/model/poll_model_2020_no_partisan_correction.stan")
+model <- rstan::stan_model("scripts/model/poll_model_2020.stan")
 
 # run model
 out <- rstan::sampling(model, data = data,
@@ -408,7 +465,7 @@ out <- rstan::sampling(model, data = data,
 
 
 # save model for today
-write_rds(out, sprintf('stan_model_%s.rds',RUN_DATE),compress = 'gz')
+write_rds(out, sprintf('models/stan_model_%s.rds',RUN_DATE),compress = 'gz')
 
 ### Extract results ----
 #out <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
@@ -417,8 +474,8 @@ write_rds(out, sprintf('stan_model_%s.rds',RUN_DATE),compress = 'gz')
 a <- rstan::extract(out, pars = "alpha")[[1]]
 hist(a)
 # delta
-delta <- rstan::extract(out, pars = "eta")[[1]]
-hist(delta)
+#delta <- rstan::extract(out, pars = "eta")[[1]]
+#hist(delta)
 
 # poll terms
 poll_terms <- rstan::extract(out, pars = "mu_c")[[1]]
