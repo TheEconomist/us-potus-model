@@ -47,10 +47,6 @@ parameters {
   matrix[S, T] raw_mu_b; 
   real<lower = 0> raw_sigma_c;
   vector[P] raw_mu_c;
-  real raw_mu_e_bias;
-  real<lower = 0> raw_sigma_e_bias;
-  real<lower = 0, upper = 1> rho_bias;
-  vector[current_T] raw_e_bias;
   real <lower = 0> raw_sigma_measure_noise_state;
   real <lower = 0> raw_sigma_measure_noise_national;
   vector[N_national] measure_noise_national;
@@ -66,9 +62,6 @@ transformed parameters {
   matrix[S, T] mu_b;
   real sigma_c;
   vector[P] mu_c;
-  real mu_e_bias;
-  real sd_e_bias;
-  vector[current_T] e_bias;
   real sigma_measure_noise_national;
   real sigma_measure_noise_state;
   vector[S] polling_error;  
@@ -87,11 +80,6 @@ transformed parameters {
   for (t in 1:(current_T - 1)) mu_b[:, current_T - t] = mu_b[:, current_T - t + 1] + raw_mu_b[:, current_T - t] * sigma_b;
   sigma_c = raw_sigma_c * prior_sigma_c;
   mu_c = raw_mu_c * sigma_c;
-  sd_e_bias = sqrt(1 - rho_bias^2);
-  mu_e_bias = raw_mu_e_bias * prior_sigma_mu_e_bias;
-  e_bias[1] = raw_e_bias[1];
-  for (t in 2:current_T) e_bias[t] = e_bias[t - 1] + raw_e_bias[t] * sd_e_bias;
-  e_bias = mu_e_bias + e_bias * prior_sigma_e_bias;
   sigma_measure_noise_national = raw_sigma_measure_noise_national * prior_sigma_measure_noise;
   sigma_measure_noise_state = raw_sigma_measure_noise_state * prior_sigma_measure_noise;
   //*** fill pi_democrat
@@ -100,14 +88,12 @@ transformed parameters {
       mu_a[day_state[i]] + 
       mu_b[state[i], day_state[i]] + 
       mu_c[poll_state[i]] + 
-      //unadjusted_state[i] * e_bias[day_state[i]] +
       measure_noise_state[i] * sigma_measure_noise_state + polling_error[state[i]];
   }
   logit_pi_democrat_national = 
     mu_a[day_national] + 
     alpha + 
     mu_c[poll_national] + 
-    //unadjusted_national .* e_bias[day_national] +
     measure_noise_national * sigma_measure_noise_national;
 }
 model {
@@ -120,10 +106,6 @@ model {
   to_vector(raw_mu_b) ~ std_normal();
   raw_sigma_c ~ std_normal();
   raw_mu_c ~ std_normal();
-  raw_mu_e_bias ~ std_normal();
-  raw_sigma_e_bias ~ std_normal();
-  rho_bias ~ normal(0.5, 0.25);
-  raw_e_bias ~ std_normal();
   raw_sigma_measure_noise_state ~ std_normal();
   raw_sigma_measure_noise_national ~ std_normal();
   measure_noise_national ~ std_normal();

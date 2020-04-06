@@ -4,6 +4,8 @@
 ## Setup
 rm(list = ls())
 options(mc.cores = 2)
+n_iter <- 1000
+n_warmup <- 500
 
 ## Libraries
 {
@@ -13,18 +15,13 @@ options(mc.cores = 2)
   library(stringr, quietly = TRUE)
   library(lubridate, quietly = TRUE)
   library(curl, quietly = TRUE)
-  library(shinystan, quietly = TRUE)
-  library(rmarkdown, quietly = TRUE)
   library(survey, quietly = TRUE)
   library(gridExtra, quietly = TRUE)
   library(pbapply, quietly = TRUE)
-  library(here, quietly = TRUE)
   library(boot, quietly = TRUE)
   library(lqmm, quietly = TRUE)
-  library(caret, quietly = TRUE)
   library(gridExtra, quietly = TRUE)
   library(ggrepel, quietly = TRUE)
-  #library(glmnet, quietly = TRUE)
 }
 
 
@@ -48,14 +45,12 @@ start_date <- as.Date("2016-03-01") # Keeping all polls after March 1, 2016
 #setwd(here("data/"))
 all_polls <- read.csv("data/all_polls.csv", stringsAsFactors = FALSE, header = TRUE)
 
-
 # select relevant columns from HufFPost polls
 all_polls <- all_polls %>%
   dplyr::select(state, pollster, number.of.observations, population, mode, 
                 start.date, 
                 end.date,
                 clinton, trump, undecided, other, johnson, mcmullin)
-
 
 # make sure we've got nothing from the futuree
 all_polls <- all_polls %>%
@@ -104,14 +99,9 @@ df <- df %>%
          n_other = round(n * other/100),
          p_other = other/100)
 
-
-
-
 # prepare stan date -----------------------------------------------------------
 
-# create correlation matrix ---------------------------------------------
-
-#here("data")
+## --- create correlation matrix
 state_data <- read.csv("data/potus_results_76_16.csv")
 state_data <- state_data %>% 
   select(year, state, dem) %>%
@@ -120,7 +110,6 @@ state_data <- state_data %>%
   select(state,variable=year,value=dem)  %>%
   ungroup() %>%
   na.omit()
-
 census <- read.csv('data/acs_2013_variables.csv')
 census <- census %>%
   filter(!is.na(state)) %>% 
@@ -128,25 +117,17 @@ census <- census %>%
   group_by(state) %>%
   gather(variable,value,
          1:(ncol(.)-1))
-
 state_data <- state_data %>%
   mutate(variable = as.character(variable)) %>%
   bind_rows(census)
-
 # add region, as a dummy for each region
 regions <- read_csv('data/state_region_crosswalk.csv') %>%
   select(state = state_abb, variable=region) %>%
   mutate(value = 1) %>%
   spread(variable,value)
-
 regions[is.na(regions)] <- 0
-
 regions <- regions %>%
   gather(variable,value,2:ncol(.))
-
-#state_data <- state_data %>%
-  #bind_rows(regions)
-
 # scale and spread
 state_data <- state_data %>%
   group_by(variable) %>%
@@ -169,32 +150,22 @@ state_data %>%
 state_correlation <- cor(state_data)  
 state_correlation[state_correlation < 0] <- 0 # nothing should be negatively correlated
 state_correlation <- make.positive.definite(state_correlation)
-
-#state_correlation_error <- state_correlation # covariance for backward walk
-state_correlation_error <- cov_matrix(51, 0.1^2, 0.8) # 0.08^2
+state_correlation_error <- cov_matrix(51, 0.1^2, 0.8) 
 state_correlation_error <- state_correlation_error * state_correlation
-
-#state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
-state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.07, rho = 0.5) #1/20
+state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.07, rho = 0.5) 
 state_correlation_mu_b_T <- state_correlation_mu_b_T * state_correlation
-
-# state_correlation_mu_b_walk <- state_correlation
 state_correlation_mu_b_walk <- cov_matrix(51, (0.015)^2, 0.75) 
 state_correlation_mu_b_walk <- state_correlation_mu_b_walk * state_correlation
-
-# Numerical indices passed to Stan for states, days, weeks, pollsters
+## --- numerical indices
 df <- df %>% 
   mutate(poll_day = t - min(t) + 1,
          # Factors are alphabetically sorted: 1 = --, 2 = AL, 3 = AK, 4 = AZ...
          index_s = as.numeric(factor(as.character(state),
-                                     levels = c('--',colnames(state_correlation)))),  # ensure levels are same as all 50 names in sate_correlation
+                                     levels = c('--',colnames(state_correlation)))),
+         index_s = ifelse(index_s == 1, 52, index_s - 1),
          index_t = 1 + as.numeric(t) - min(as.numeric(t)),
-         index_p = as.numeric(as.factor(as.character(pollster))))  
-
-T <- as.integer(round(difftime(election_day, min(df$start.date))))
-
-# selections
-df <- df %>%
+         index_p = as.numeric(as.factor(as.character(pollster)))) %>%
+  # selections
   arrange(state, t, polltype, two_party_sum) %>% 
   distinct(state, t, pollster, .keep_all = TRUE) %>%
   select(
@@ -203,28 +174,17 @@ df <- df %>%
     # vote shares
     p_clinton, n_clinton, 
     p_trump, n_trump, 
-    p_other, n_other, poll_day, index_s, index_p, index_t) %>%
-  mutate(index_s = ifelse(index_s == 1, 52, index_s - 1)) # national index = 51
-
-# Useful vectors ---------
-# we want to select all states, so we comment this out
-# and later declare all_polled_states to be all of them + national '--'
-all_polled_states <- df$state %>% unique %>% sort
-
+    p_other, n_other, poll_day, index_s, index_p, index_t)
+#all_polled_states <- df$state %>% unique %>% sort
 # day indices
 ndays <- max(df$t) - min(df$t)
 all_t <- min(df$t) + days(0:(ndays))
 all_t_until_election <- min(all_t) + days(0:(election_day - min(all_t)))
-
 # pollster indices
 all_pollsters <- levels(as.factor(as.character(df$pollster)))
 
 
 # Reading 2012 election data to --------- 
-# (1) get state_names and EV        
-# (2) set priors on mu_b and alpha,
-# (3) get state_weights,           
-#setwd(here("data/"))
 states2012 <- read.csv("data/2012.csv", 
                        header = TRUE, stringsAsFactors = FALSE) %>% 
   mutate(score = obama_count / (obama_count + romney_count),
@@ -233,54 +193,45 @@ states2012 <- read.csv("data/2012.csv",
          share_national_vote = (total_count*(1+adult_pop_growth_2011_15))
          /sum(total_count*(1+adult_pop_growth_2011_15))) %>%
   arrange(state) 
-
-rownames(states2012) <- states2012$state
+state_abb <- states2012$state
+rownames(states2012) <- state_abb
 
 # get state incdices
 all_states <- states2012$state
 state_name <- states2012$state_name
-names(state_name) <- states2012$state
+names(state_name) <- state_abb
 
 # set prior differences
 prior_diff_score <- states2012$delta
-names(prior_diff_score) <- all_states
+names(prior_diff_score) <- state_abb
 
 # set state weights
 state_weights <- c(states2012$share_national_vote / sum(states2012$share_national_vote))
-names(state_weights) <- c(states2012$state)
+names(state_weights) <- state_abb
 
 # electoral votes, by state:
 ev_state <- states2012$ev
-names(ev_state) <- states2012$state
+names(ev_state) <- state_abb
 
 
 ##### Creating priors --------------
 # read in abramowitz data
-#setwd(here("data/"))
 abramowitz <- read.csv('data/abramowitz_data.csv') %>% 
   filter(year < 2016)
-
-# train a caret model to predict demvote with incvote ~ q2gdp + juneapp + year:q2gdp + year:juneapp 
 prior_model <- lm(
-  incvote ~  juneapp + q2gdp, #+ year:q2gdp + year:juneapp
+  incvote ~  juneapp + q2gdp, 
   data = abramowitz
 )
 
 # make predictions
 national_mu_prior <- predict(prior_model,newdata = tibble(q2gdp = 1.1,
                                                                 juneapp = 4))
-
 cat(sprintf('Prior Clinton two-party vote is %s\nWith a standard error of %s',
             round(national_mu_prior/100,3),0.05))
-
 # on correct scale
 national_mu_prior <- national_mu_prior / 100
-
 # Mean of the mu_b_prior
-# 0.486 is the predicted Clinton share of the national vote according to the Lewis-Beck & Tien model
-# https://pollyvote.com/en/components/econometric-models/lewis-beck-tien/
 mu_b_prior <- logit(national_mu_prior + prior_diff_score)
-
 # or read in priors if generated already
 prior_in <- read_csv("data/state_priors_08_12_16.csv") %>%
   filter(date <= RUN_DATE) %>%
@@ -290,30 +241,16 @@ prior_in <- read_csv("data/state_priors_08_12_16.csv") %>%
   select(state,pred) %>%
   ungroup() %>%
   arrange(state)
-  
+
 mu_b_prior <- logit(prior_in$pred)
 names(mu_b_prior) <- prior_in$state
 names(mu_b_prior) == names(prior_diff_score) # correct order?
-
-# The model uses national polls to complement state polls when estimating the national term mu_a.
-# One problem until early September, was that voters in polled states were different from average voters :
-# Several solid red states still hadn't been polled, the weighted average of state polls was slightly more pro-Clinton than national polls.
-
+## --- Adjustment national v state polls
 score_among_polled <- sum(states2012[all_polled_states[-1],]$obama_count)/
   sum(states2012[all_polled_states[-1],]$obama_count + 
         states2012[all_polled_states[-1],]$romney_count)
-
 alpha_prior <- log(states2012$national_score[1]/score_among_polled)
-
-
-y <- MASS::mvrnorm(1000, mu_b_prior, Sigma = state_correlation_error)
-cbind(
-  inv.logit(apply(y, MARGIN = 2, mean)),
-  inv.logit(apply(y, MARGIN = 2, mean) + 1.96 * apply(y, MARGIN = 2, sd)), 
-  inv.logit(apply(y, MARGIN = 2, mean) - 1.96 * apply(y, MARGIN = 2, sd)))
-
-
-## adjusts
+## adjusting polling houses
 adjusters <- c(
   "ABC",
   "Washington Post",
@@ -324,36 +261,10 @@ adjusters <- c(
   "NBC"
 )
 
-
-# First stage predictions -------
-N <- nrow(df)
-S <- 51
-s <- df$index_s
-n_respondents <- df$n_respondents
-n_two_parties <- df$n_clinton + df$n_trump
-
-data_1st <- list(
-  # dimensions
-  N = N,
-  S = S,
-  # index
-  s = s,
-  # data
-  n_respondents = n_respondents,
-  n_two_parties = n_two_parties
-)
-# model
-m_1st <- rstan::stan_model("scripts/Stan/Refactored/poll_model_1st_stage_v3.stan")
-# run
-out <- rstan::sampling(m_1st, data = data_1st, iter = 1000,warmup=500, chains = 2)
-# extract
-two_share_mu <- apply(rstan::extract(out, pars = "two_parties_mu")[[1]], MARGIN = 2, mean)
-two_share_sd <- apply(rstan::extract(out, pars = "two_parties_sd")[[1]], MARGIN = 2, mean)
-
 # Passing the data to Stan and running the model ---------
 N_state <- nrow(df %>% filter(index_s != 52))
 N_national <- nrow(df %>% filter(index_s == 52))
-T <- T
+T <- as.integer(round(difftime(election_day, min(df$start.date))))
 current_T <- max(df$poll_day)
 S <- 51
 P <- length(unique(df$pollster))
@@ -367,10 +278,6 @@ n_democrat_national <- df %>% filter(index_s == 52) %>% pull(n_clinton)
 n_democrat_state <- df %>% filter(index_s != 52) %>% pull(n_clinton)
 n_two_share_national <- df %>% filter(index_s == 52) %>% transmute(n_two_share = n_trump + n_clinton) %>% pull(n_two_share)
 n_two_share_state <- df %>% filter(index_s != 52) %>% transmute(n_two_share = n_trump + n_clinton) %>% pull(n_two_share)
-pred_two_share_national_mu    <- two_share_mu[52]
-pred_two_share_state_mu       <- two_share_mu[1:51]
-pred_two_share_national_sigma <- two_share_sd[52]
-pred_two_share_state_sigma    <- two_share_sd[1:51]
 unadjusted_national <- df %>% mutate(unadjusted = ifelse(!(pollster %in% adjusters), 1, 0)) %>% filter(index_s == 52) %>% pull(unadjusted)
 unadjusted_state <- df %>% mutate(unadjusted = ifelse(!(pollster %in% adjusters), 1, 0)) %>% filter(index_s != 52) %>% pull(unadjusted)
 
@@ -403,10 +310,6 @@ data <- list(
   n_democrat_state = n_democrat_state,
   n_two_share_national = n_two_share_national,
   n_two_share_state = n_two_share_state,
-  pred_two_share_national_mu = pred_two_share_national_mu,
-  pred_two_share_state_mu = pred_two_share_state_mu,
-  pred_two_share_national_sigma = pred_two_share_national_sigma,
-  pred_two_share_state_sigma = pred_two_share_state_sigma,
   unadjusted_national = unadjusted_national,
   unadjusted_state = unadjusted_state,
   current_T = as.integer(current_T),
@@ -450,17 +353,11 @@ initf2 <- function(chain_id = 1) {
 init_ll <- lapply(1:n_chains, function(id) initf2(chain_id = id))
 
 ### Run ----
-
-#setwd(here("scripts/Stan/Refactored/"))
-
-# read model code
 #model <- rstan::stan_model("scripts/model/poll_model_2020_no_partisan_correction.stan")
 model <- rstan::stan_model("scripts/model/poll_model_2020.stan")
-
-# run model
 out <- rstan::sampling(model, data = data,
                        refresh=50,
-                       chains = 2, iter = 1000, warmup=500, init = init_ll
+                       chains = 2, iter = n_iter, warmup = n_warmup, init = init_ll
 )
 
 
@@ -470,12 +367,19 @@ write_rds(out, sprintf('models/stan_model_%s.rds',RUN_DATE),compress = 'gz')
 ### Extract results ----
 #out <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
 
+## --- priors
+y <- MASS::mvrnorm(1000, mu_b_prior, Sigma = state_correlation_error)
+cbind(
+  inv.logit(apply(y, MARGIN = 2, mean)),
+  inv.logit(apply(y, MARGIN = 2, mean) + 1.96 * apply(y, MARGIN = 2, sd)), 
+  inv.logit(apply(y, MARGIN = 2, mean) - 1.96 * apply(y, MARGIN = 2, sd)))
+
+
+
+
 # etc
 a <- rstan::extract(out, pars = "alpha")[[1]]
 hist(a)
-# delta
-#delta <- rstan::extract(out, pars = "eta")[[1]]
-#hist(delta)
 
 # poll terms
 poll_terms <- rstan::extract(out, pars = "mu_c")[[1]]
