@@ -5,8 +5,6 @@ date: "Last update on `r format(Sys.time(), '%A %B %d, %Y at %I:%M %p %Z',tz='US
 output: 
   html_document:
     theme: readable
-    keep_md: true
-    
 ---
 
 ---
