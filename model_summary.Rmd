@@ -5,6 +5,8 @@ date: "Last update on `r format(Sys.time(), '%A %B %d, %Y at %I:%M %p %Z',tz='US
 output: 
   html_document:
     theme: readable
+    keep_md: true
+    
 ---
 
 ---
@@ -29,7 +31,7 @@ library(DT)
 # source('scripts/R/Backtesting/v8_2008.R');source('scripts/R/Backtesting/v8_2012.R');source('scripts/R/Refactored/poll_run_v8.R');rmarkdown::render('model_summary.Rmd');beepr::beep(2)
 
 # model version final:
-# source('scripts/R/Backtesting/final_2008.R');source('scripts/R/Backtesting/final_2012.R');source('scripts/model/poll_model_2020.R');rmarkdown::render('model_summary.Rmd');beepr::beep(2)
+# source('scripts/R/Backtesting/final_2008.R');source('scripts/R/Backtesting/final_2012.R');source('scripts/model/poll_model_2020.R');rmarkdown::render('model_summary.Rmd');beepr::beep(2);
 ```
 
 ## Methodology
