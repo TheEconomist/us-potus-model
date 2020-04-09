@@ -311,7 +311,6 @@ mean( inv.logit(apply(y, MARGIN = 2, mean) +  apply(y, MARGIN = 2, sd)) - inv.lo
 adjusters <- c(
   "ABC",
   "Washington Post",
-  "IBD",
   "Ipsos",
   "Pew",
   "YouGov",

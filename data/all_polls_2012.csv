@@ -8,8 +8,8 @@ VA,Roanoke College,607,2/28/12,3/2/12,42,43,15,0,Live Phone,Registered Voters
 NJ,Quinnipiac,1396,2/29/12,3/3/12,49,39,12,0,Live Phone,Registered Voters
 WI,Rasmussen,500,2/29/12,3/3/12,47,42,11,0,Live Phone,Registered Voters
 WI,Public Policy,900,3/1/12,3/4/12,53,39,8,0,Live Phone,Registered Voters
-VA,NBC News/Marist,1273,3/4/12,3/7/12,52,35,13,0,Live Phone,Registered Voters
-OH,NBC News/Marist,1573,3/4/12,3/7/12,50,38,12,0,Live Phone,Registered Voters
+VA,NBC/Marist,1273,3/4/12,3/7/12,52,35,13,0,Live Phone,Registered Voters
+OH,NBC/Marist,1573,3/4/12,3/7/12,50,38,12,0,Live Phone,Registered Voters
 MA,Western New England Univ.,527,3/5/12,3/8/12,60,36,4,0,Live Phone,Registered Voters
 MA,Rasmussen,500,3/5/12,3/8/12,55,38,7,0,Live Phone,Registered Voters
 NE,Rasmussen,500,3/7/12,3/10/12,35,52,13,0,Live Phone,Likely Voters
@@ -37,7 +37,7 @@ PA,Quinnipiac,1232,3/28/12,3/31/12,45,42,13,0,Live Phone,Registered Voters
 NE,Public Policy,1028,3/28/12,3/31/12,39,51,10,0,Live Phone,Likely Voters
 WI,Rasmussen,500,3/29/12,4/1/12,52,41,7,0,Live Phone,Likely Voters
 OH,Rasmussen,500,3/29/12,4/1/12,48,40,12,0,Live Phone,Likely Voters
-WI,NBC News/Marist,2792,3/30/12,4/2/12,52,35,13,0,Live Phone,Registered Voters
+WI,NBC/Marist,2792,3/30/12,4/2/12,52,35,13,0,Live Phone,Registered Voters
 CA,SurveyUSA,1995,4/3/12,4/6/12,62,31,7,0,Live Phone,Registered Voters
 NV,Public Policy,553,4/4/12,4/7/12,51,43,6,0,Live Phone,Registered Voters
 IN,Howey / DePauw,503,4/4/12,4/7/12,40,49,11,0,Live Phone,Likely Voters
@@ -55,19 +55,19 @@ MA,Rasmussen,500,4/11/12,4/14/12,51,40,9,0,Live Phone,Likely Voters
 NC,Public Policy,975,4/11/12,4/14/12,49,44,7,0,Live Phone,Registered Voters
 NJ,Quinnipiac,1607,4/12/12,4/15/12,49,40,11,0,Live Phone,Registered Voters
 --,Quinnipiac,2577,4/11/12,4/16/12,46,42,2,8,Live Phone,Likely Voters
---,Gallup Tracking,2200,4/11/12,4/16/12,45,47,2,4,Live Phone,Likely Voters
+--,Gallup ,2200,4/11/12,4/16/12,45,47,2,4,Live Phone,Likely Voters
 NC,Rasmussen,500,4/13/12,4/16/12,44,46,10,0,Live Phone,Likely Voters
 --,Public Policy Polling,900,4/12/12,4/17/12,49,46,0,2,Live Phone,Likely Voters
 --,Reuters/Ipsos,891,4/12/12,4/17/12,47,43,2,6,Live Phone,Likely Voters
---,Rasmussen Tracking,1500,4/12/12,4/17/12,44,48,2,4,Live Phone,Likely Voters
+--,Rasmussen ,1500,4/12/12,4/17/12,44,48,2,4,Live Phone,Likely Voters
 --,CNN/Opinion Research,910,4/13/12,4/18/12,52,43,0,2,Live Phone,Likely Voters
 --,NBC/Wall Street Journal,1000,4/13/12,4/18/12,49,43,2,4,Live Phone,Likely Voters
 --,CBS News/New York Times,852,4/13/12,4/18/12,46,46,2,4,Live Phone,Likely Voters
---,Economist/YouGov,1000,4/14/12,4/19/12,49,42,2,6,Live Phone,Likely Voters
+--,YouGov/YouGov,1000,4/14/12,4/19/12,49,42,2,6,Live Phone,Likely Voters
 NY,NY1/YNN-Marist,632,4/17/12,4/20/12,57,35,8,0,Live Phone,Registered Voters
 FL,Public Policy,700,4/17/12,4/20/12,50,45,5,0,Live Phone,Registered Voters
---,Rasmussen Tracking,1500,4/15/12,4/20/12,43,47,2,6,Live Phone,Likely Voters
---,Gallup Tracking,2200,4/16/12,4/21/12,45,46,2,6,Live Phone,Likely Voters
+--,Rasmussen ,1500,4/15/12,4/20/12,43,47,2,6,Live Phone,Likely Voters
+--,Gallup ,2200,4/16/12,4/21/12,45,46,2,6,Live Phone,Likely Voters
 NH,Rockefeller Ctr. (Dartmouth),403,4/18/12,4/21/12,42,44,14,0,Live Phone,Registered Voters
 FL,Fox News,757,4/19/12,4/22/12,45,43,12,0,Live Phone,Registered Voters
 MO,Rasmussen,500,4/19/12,4/22/12,45,48,7,0,Live Phone,Likely Voters
@@ -76,7 +76,7 @@ OH,Rasmussen,500,4/20/12,4/23/12,46,42,12,0,Live Phone,Likely Voters
 --,Public Policy Polling/Daily Kos/SEIU,1000,4/19/12,4/24/12,49,44,2,4,Live Phone,Likely Voters
 --,National Journal,1004,4/19/12,4/24/12,47,39,4,8,Live Phone,Likely Voters
 NH,Granite State Poll - Univ. of NH,538,4/23/12,4/26/12,51,42,7,0,Live Phone,Registered Voters
---,Gallup Tracking,2200,4/21/12,4/26/12,50,43,2,4,Live Phone,Likely Voters
+--,Gallup ,2200,4/21/12,4/26/12,50,43,2,4,Live Phone,Likely Voters
 OH,Purple Strategies,600,4/23/12,4/26/12,49,44,7,0,Live Phone,Likely Voters
 VA,Purple Strategies,600,4/23/12,4/26/12,48,46,6,0,Live Phone,Likely Voters
 CO,Purple Strategies,600,4/23/12,4/26/12,47,47,6,0,Live Phone,Likely Voters
@@ -86,17 +86,17 @@ TX,Public Policy,591,4/24/12,4/27/12,43,50,7,0,Live Phone,Registered Voters
 NM,Public Policy,526,4/25/12,4/28/12,54,40,6,0,Live Phone,Registered Voters
 VA,Rasmussen,500,4/25/12,4/28/12,44,45,11,0,Live Phone,Likely Voters
 AZ,Behavior Research Center,511,4/25/12,4/28/12,42,40,18,0,Live Phone,Registered Voters
---,Rasmussen Tracking,1500,4/24/12,4/29/12,47,46,2,4,Live Phone,Likely Voters
+--,Rasmussen ,1500,4/24/12,4/29/12,47,46,2,4,Live Phone,Likely Voters
 FL,Rasmussen,500,4/27/12,4/30/12,45,46,9,0,Live Phone,Likely Voters
 --,Investor's Business Daily/Christian Science Monitor/TIPP,856,4/27/12,5/2/12,46,43,2,6,Live Phone,Likely Voters
---,Gallup Tracking,2200,4/27/12,5/2/12,45,46,2,6,Live Phone,Likely Voters
+--,Gallup ,2200,4/27/12,5/2/12,45,46,2,6,Live Phone,Likely Voters
 VA,Public Policy,680,5/1/12,5/4/12,51,43,6,0,Live Phone,Registered Voters
 NC,SurveyUSA,1636,5/1/12,5/4/12,47,43,10,0,Live Phone,Registered Voters
 --,Politico/George Washington University,1000,4/29/12,5/4/12,47,48,0,2,Live Phone,Likely Voters
 WV,The West Va. Poll (R.L. Repass),410,5/1/12,5/4/12,37,54,9,0,Live Phone,Registered Voters
 NV,Rasmussen,500,5/2/12,5/5/12,52,44,4,0,Live Phone,Likely Voters
 WI,Marquette Univ. Law School,705,5/2/12,5/5/12,51,42,7,0,Live Phone,Registered Voters
---,Rasmussen Tracking,1500,4/30/12,5/5/12,47,45,2,4,Live Phone,Likely Voters
+--,Rasmussen ,1500,4/30/12,5/5/12,47,45,2,4,Live Phone,Likely Voters
 MT,Public Policy,934,5/2/12,5/5/12,43,48,9,0,Live Phone,Registered Voters
 VA,Washington Post,1101,5/3/12,5/6/12,51,44,5,0,Live Phone,Registered Voters
 PA,Quinnipiac,1168,5/3/12,5/6/12,47,39,14,0,Live Phone,Registered Voters
@@ -106,7 +106,7 @@ FL,Quinnipiac,1169,5/3/12,5/6/12,43,44,13,0,Live Phone,Registered Voters
 MT,Rasmussen,450,5/4/12,5/7/12,44,51,5,0,Live Phone,Registered Voters
 --,Associated Press,871,5/3/12,5/8/12,50,42,2,4,Live Phone,Likely Voters
 --,Reuters,900,5/3/12,5/8/12,49,42,2,6,Live Phone,Likely Voters
---,Gallup Tracking,3000,5/3/12,5/8/12,44,47,2,6,Live Phone,Likely Voters
+--,Gallup ,3000,5/3/12,5/8/12,44,47,2,6,Live Phone,Likely Voters
 IA,Public Policy,1181,5/8/12,5/11/12,51,41,8,0,Live Phone,Registered Voters
 OH,Public Policy,875,5/8/12,5/11/12,50,43,7,0,Live Phone,Registered Voters
 MA,Rasmussen,500,5/9/12,5/12/12,56,35,9,0,Live Phone,Likely Voters
@@ -115,7 +115,7 @@ FL,Suffolk University,600,5/9/12,5/12/12,46,45,9,0,Live Phone,Registered Voters
 --,Angus Reid Public Opinion,769,5/7/12,5/12/12,45,46,2,6,Live Phone,Likely Voters
 WA,SurveyUSA,557,5/10/12,5/13/12,50,36,14,0,Live Phone,Registered Voters
 OR,SurveyUSA,1468,5/10/12,5/13/12,47,43,10,0,Live Phone,Registered Voters
---,Gallup Tracking,2200,5/8/12,5/13/12,46,45,2,6,Live Phone,Likely Voters
+--,Gallup ,2200,5/8/12,5/13/12,46,45,2,6,Live Phone,Likely Voters
 OH,Quinnipiac,1069,5/10/12,5/13/12,45,44,11,0,Live Phone,Registered Voters
 GA,Landmark/RosettaStone,600,5/10/12,5/13/12,40.2,51.1,8.7,0,Live Phone,Registered Voters
 MN,SurveyUSA,516,5/11/12,5/14/12,52,38,10,0,Live Phone,Registered Voters
@@ -123,10 +123,10 @@ WI,Rasmussen,500,5/11/12,5/14/12,49,45,6,0,Live Phone,Likely Voters
 --,Pew,3003,5/9/12,5/14/12,49,42,2,6,Live Phone,Likely Voters
 MI,Glengariff Group,600,5/11/12,5/14/12,45.1,39.5,15.4,0,Live Phone,Registered Voters
 ME,Critical Insights,600,5/12/12,5/15/12,50,42,8,0,Live Phone,Registered Voters
---,Gallup Tracking,3050,5/11/12,5/16/12,45,46,2,6,Live Phone,Likely Voters
+--,Gallup ,3050,5/11/12,5/16/12,45,46,2,6,Live Phone,Likely Voters
 --,CBS News/New York Times,562,5/11/12,5/16/12,43,46,2,6,Live Phone,Likely Voters
 NY,Siena College,766,5/14/12,5/17/12,57,37,6,0,Live Phone,Registered Voters
---,Rasmussen Tracking,1500,5/12/12,5/17/12,46,45,2,6,Live Phone,Likely Voters
+--,Rasmussen ,1500,5/12/12,5/17/12,46,45,2,6,Live Phone,Likely Voters
 NH,Public Policy,1163,5/15/12,5/18/12,53,41,6,0,Live Phone,Registered Voters
 WI,Public Policy,851,5/15/12,5/18/12,47,46,7,0,Live Phone,Registered Voters
 --,Fox News/Anderson Robbins/Shaw & Co.,913,5/13/12,5/18/12,46,39,4,10,Live Phone,Likely Voters
@@ -134,7 +134,7 @@ NJ,Quinnipiac,1582,5/16/12,5/19/12,49,39,12,0,Live Phone,Registered Voters
 NC,Public Policy,666,5/16/12,5/19/12,48,47,5,0,Live Phone,Registered Voters
 WI,Marquette Univ. Law School,704,5/16/12,5/19/12,46,46,8,0,Live Phone,Registered Voters
 NC,Rasmussen,500,5/16/12,5/19/12,43,51,6,0,Live Phone,Likely Voters
---,NBC News/Wall Street Journal,1000,5/16/12,5/21/12,47,43,2,6,Live Phone,Likely Voters
+--,NBC/WSJ,1000,5/16/12,5/21/12,47,43,2,6,Live Phone,Likely Voters
 NE,Rasmussen,500,5/18/12,5/21/12,39,53,8,0,Live Phone,Likely Voters
 --,ABC News/Washington Post,1004,5/17/12,5/22/12,49,45,0,4,Live Phone,Likely Voters
 TN,Vanderbilt University,,5/20/12,5/23/12,40,47,13,0,Live Phone,Registered Voters
@@ -149,9 +149,9 @@ AZ,Public Policy,500,5/23/12,5/26/12,43,50,7,0,Live Phone,Registered Voters
 FL,Quinnipiac,1722,5/23/12,5/26/12,41,47,12,0,Live Phone,Registered Voters
 MA,Suffolk University,600,5/24/12,5/27/12,59,34,7,0,Live Phone,Likely Voters
 WI,St. Norbert College,406,5/24/12,5/27/12,49,43,8,0,Live Phone,Likely Voters
-FL,NBC News/Marist,1078,5/24/12,5/27/12,48,44,8,0,Live Phone,Registered Voters
-OH,NBC News/Marist,1103,5/24/12,5/27/12,48,42,10,0,Live Phone,Registered Voters
-VA,NBC News/Marist,1076,5/24/12,5/27/12,48,44,8,0,Live Phone,Registered Voters
+FL,NBC/Marist,1078,5/24/12,5/27/12,48,44,8,0,Live Phone,Registered Voters
+OH,NBC/Marist,1103,5/24/12,5/27/12,48,42,10,0,Live Phone,Registered Voters
+VA,NBC/Marist,1076,5/24/12,5/27/12,48,44,8,0,Live Phone,Registered Voters
 GA,InsiderAdvantage,438,5/24/12,5/27/12,39.9,52.3,7.8,0,Live Phone,Likely Voters
 IN,Rasmussen,600,5/25/12,5/28/12,42,48,10,0,Live Phone,Likely Voters
 NC,Civitas,600,5/27/12,5/30/12,45,47,8,0,Live Phone,Registered Voters
@@ -164,9 +164,9 @@ CA,SurveyUSA,1575,5/31/12,6/3/12,57,36,7,0,Live Phone,Registered Voters
 NY,Quinnipiac,1504,5/31/12,6/3/12,56,31,13,0,Live Phone,Registered Voters
 WA,Strategies 360,500,5/31/12,6/3/12,51,40,9,0,Live Phone,Likely Voters
 NM,FM3 for Patriot Majority,502,5/31/12,6/3/12,48,35,17,0,Live Phone,Registered Voters
-NV,NBC News/Marist,1040,5/31/12,6/3/12,48,46,6,0,Live Phone,Registered Voters
-CO,NBC News/Marist,1030,5/31/12,6/3/12,46,45,9,0,Live Phone,Registered Voters
-IA,NBC News/Marist,1106,5/31/12,6/3/12,44,44,12,0,Live Phone,Registered Voters
+NV,NBC/Marist,1040,5/31/12,6/3/12,48,46,6,0,Live Phone,Registered Voters
+CO,NBC/Marist,1030,5/31/12,6/3/12,46,45,9,0,Live Phone,Registered Voters
+IA,NBC/Marist,1106,5/31/12,6/3/12,44,44,12,0,Live Phone,Registered Voters
 OH,Rasmussen,500,5/31/12,6/3/12,44,46,10,0,Live Phone,Likely Voters
 CA,Field Research,710,6/1/12,6/4/12,48,32,20,0,Live Phone,Registered Voters
 MA,Western New England Univ.,504,6/2/12,6/5/12,56,34,10,0,Live Phone,Registered Voters
@@ -174,8 +174,8 @@ MA,Western New England Univ.,504,6/2/12,6/5/12,56,34,10,0,Live Phone,Registered 
 MA,Boston Globe/UNH/Cornell,651,6/2/12,6/5/12,46,34,20,0,Live Phone,Registered Voters
 FL,Public Policy,642,6/4/12,6/7/12,50,46,4,0,Live Phone,Registered Voters
 VA,Rasmussen,500,6/4/12,6/7/12,47,47,6,0,Live Phone,Likely Voters
---,The Economist/YouGov,1000,6/2/12,6/7/12,47,42,2,6,Live Phone,Likely Voters
---,Rasmussen Tracking,1500,6/2/12,6/7/12,44,48,2,4,Live Phone,Likely Voters
+--,YouGov,1000,6/2/12,6/7/12,47,42,2,6,Live Phone,Likely Voters
+--,Rasmussen ,1500,6/2/12,6/7/12,44,48,2,4,Live Phone,Likely Voters
 CT,Quinnipiac,1408,6/6/12,6/9/12,50,38,12,0,Live Phone,Registered Voters
 PA,Franklin & Marshall,412,6/6/12,6/9/12,48,36,16,0,Live Phone,Registered Voters
 MN,Public Policy,973,6/7/12,6/10/12,54,39,7,0,Live Phone,Registered Voters
@@ -202,7 +202,7 @@ PA,Quinnipiac,997,6/12/12,6/15/12,46,40,14,0,Live Phone,Registered Voters
 NV,Public Policy,500,6/13/12,6/16/12,48,42,10,0,Live Phone,Registered Voters
 WI,Rasmussen,500,6/13/12,6/16/12,44,47,9,0,Live Phone,Likely Voters
 NJ,Rutgers-Eagleton,1065,6/14/12,6/17/12,56,33,11,0,Live Phone,Registered Voters
---,Rasmussen Tracking,1500,6/12/12,6/17/12,45,46,2,6,Live Phone,Likely Voters
+--,Rasmussen ,1500,6/12/12,6/17/12,45,46,2,6,Live Phone,Likely Voters
 MI,Rasmussen,500,6/15/12,6/18/12,50,42,8,0,Live Phone,Likely Voters
 --,Associated Press,878,6/14/12,6/19/12,47,44,2,6,Live Phone,Likely Voters
 --,Selzer/Bloomberg,734,6/15/12,6/20/12,53,40,2,4,Live Phone,Likely Voters
@@ -218,8 +218,8 @@ MT,Rasmussen,500,6/20/12,6/23/12,42,51,7,0,Live Phone,Likely Voters
 NH,Rasmussen,500,6/21/12,6/24/12,48,43,9,0,Live Phone,Likely Voters
 MI,Mitchell Research,750,6/21/12,6/24/12,47,46,7,0,Live Phone,Likely Voters
 FL,Quinnipiac,1697,6/21/12,6/24/12,46,42,12,0,Live Phone,Registered Voters
---,NBC News/Wall Street Journal,819,6/20/12,6/25/12,47,44,2,6,Live Phone,Likely Voters
---,Gallup Tracking,3050,6/20/12,6/25/12,46,44,2,6,Live Phone,Likely Voters
+--,NBC/WSJ,819,6/20/12,6/25/12,47,44,2,6,Live Phone,Likely Voters
+--,Gallup ,3050,6/20/12,6/25/12,46,44,2,6,Live Phone,Likely Voters
 UT,Dan Jones & Assoc.,1222,6/23/12,6/26/12,26,68,6,0,Live Phone,Registered Voters
 PA,Susquehanna Polling & Research,,6/24/12,6/27/12,48,43,9,0,Live Phone,Registered Voters
 NH,American Research Group,535,6/25/12,6/28/12,51,43,6,0,Live Phone,Registered Voters
@@ -227,7 +227,7 @@ OR,Public Policy,686,6/26/12,6/29/12,50,42,8,0,Live Phone,Registered Voters
 OH,Public Policy,673,6/26/12,6/29/12,47,44,9,0,Live Phone,Registered Voters
 CO,We Ask America,1083,6/26/12,6/29/12,46.6,43,10.4,0,Live Phone,Likely Voters
 --,Fox News,912,6/24/12,6/29/12,45,40,4,10,Live Phone,Likely Voters
---,Rasmussen Tracking,1500,6/24/12,6/29/12,45,45,2,6,Live Phone,Likely Voters
+--,Rasmussen ,1500,6/24/12,6/29/12,45,45,2,6,Live Phone,Likely Voters
 NC,Rasmussen,500,6/26/12,6/29/12,44,47,9,0,Live Phone,Likely Voters
 VA,We Ask America,1106,6/26/12,6/29/12,43.3,48,8.7,0,Live Phone,Likely Voters
 MA,Public Policy,902,6/27/12,6/30/12,55,39,6,0,Live Phone,Registered Voters
@@ -235,22 +235,22 @@ OH,Quinnipiac,1237,6/27/12,6/30/12,47,38,15,0,Live Phone,Registered Voters
 FL,Quinnipiac,1200,6/27/12,6/30/12,45,41,14,0,Live Phone,Registered Voters
 PA,Quinnipiac,1252,6/27/12,6/30/12,45,39,16,0,Live Phone,Registered Voters
 AZ,Rasmussen,500,6/27/12,6/30/12,41,54,5,0,Live Phone,Likely Voters
-MI,NBC News/Marist,1078,6/28/12,7/1/12,47,43,10,0,Live Phone,Registered Voters
-NC,NBC News/Marist,1019,6/28/12,7/1/12,46,44,10,0,Live Phone,Registered Voters
-NH,NBC News/Marist,1029,6/28/12,7/1/12,45,45,10,0,Live Phone,Registered Voters
+MI,NBC/Marist,1078,6/28/12,7/1/12,47,43,10,0,Live Phone,Registered Voters
+NC,NBC/Marist,1019,6/28/12,7/1/12,46,44,10,0,Live Phone,Registered Voters
+NH,NBC/Marist,1029,6/28/12,7/1/12,45,45,10,0,Live Phone,Registered Voters
 AL,Capital Survey Research Center,551,6/29/12,7/2/12,36.4,51.3,12.3,0,Live Phone,Registered Voters
 --,Pew,2373,6/28/12,7/3/12,50,43,2,4,Live Phone,Likely Voters
 --,CNN/ORC,1390,6/28/12,7/3/12,49,46,0,2,Live Phone,Likely Voters
 --,PPP/Daily Kos & SEIU,1000,6/28/12,7/3/12,48,45,2,4,Live Phone,Likely Voters
 --,Newsweek/The Daily Beast,600,6/28/12,7/3/12,47,44,2,6,Live Phone,Likely Voters
---,YouGov/The Economist,1000,6/30/12,7/5/12,47,43,2,6,Live Phone,Likely Voters
+--,YouGov/The YouGov,1000,6/30/12,7/5/12,47,43,2,6,Live Phone,Likely Voters
 FL,We Ask America,1127,7/3/12,7/6/12,46.1,45.3,8.6,0,Live Phone,Likely Voters
 --,Quinnipiac,2722,7/1/12,7/6/12,46,43,2,6,Live Phone,Likely Voters
 NC,Civitas,558,7/3/12,7/6/12,45,50,5,0,Live Phone,Registered Voters
 CA,Field Research,848,7/6/12,7/9/12,55,37,8,0,Live Phone,Likely Voters
 --,Reuters/Ipsos,885,7/5/12,7/10/12,49,43,2,4,Live Phone,Likely Voters
 --,ABC News/Washington Post,1003,7/5/12,7/10/12,47,47,0,4,Live Phone,Likely Voters
---,Gallup Tracking,3050,7/5/12,7/10/12,47,44,2,6,Live Phone,Likely Voters
+--,Gallup ,3050,7/5/12,7/10/12,47,44,2,6,Live Phone,Likely Voters
 --,JZ Analytics/Washington Times,800,7/6/12,7/11/12,42,43,4,10,Live Phone,Likely Voters
 VA,Public Policy,647,7/10/12,7/13/12,50,42,8,0,Live Phone,Registered Voters
 NC,Public Policy,775,7/10/12,7/13/12,47,46,7,0,Live Phone,Registered Voters
@@ -262,7 +262,7 @@ ME,Critical Insights,615,7/11/12,7/14/12,49,35,16,0,Live Phone,Registered Voters
 --,McClatchy/Marist,849,7/9/12,7/14/12,48,46,0,4,Live Phone,Likely Voters
 PA,We Ask America,1227,7/11/12,7/14/12,47,40,13,0,Live Phone,Likely Voters
 --,Democracy Corps & Resurgent Republic/NPR,1000,7/9/12,7/14/12,47,45,2,4,Live Phone,Likely Voters
---,Rasmussen Tracking,1500,7/9/12,7/14/12,45,46,2,6,Live Phone,Likely Voters
+--,Rasmussen ,1500,7/9/12,7/14/12,45,46,2,6,Live Phone,Likely Voters
 NC,Project New America,500,7/12/12,7/15/12,48,49,3,0,Live Phone,Likely Voters
 --,CBS/New York Times,1089,7/11/12,7/16/12,46,47,2,4,Live Phone,Likely Voters
 ND,Rasmussen,400,7/13/12,7/16/12,36,51,13,0,Live Phone,Likely Voters
@@ -270,7 +270,7 @@ ND,Rasmussen,400,7/13/12,7/16/12,36,51,13,0,Live Phone,Likely Voters
 --,Angus Reid Public Opinion,1001,7/12/12,7/17/12,47,47,0,4,Live Phone,Likely Voters
 FL,Mason-Dixon,800,7/14/12,7/17/12,46,45,9,0,Live Phone,Registered Voters
 OH,Purple Strategies,600,7/16/12,7/19/12,48,45,7,0,Live Phone,Likely Voters
---,The Economist/YouGov,838,7/14/12,7/19/12,47,44,2,6,Live Phone,Likely Voters
+--,YouGov,838,7/14/12,7/19/12,47,44,2,6,Live Phone,Likely Voters
 VA,Purple Strategies,600,7/16/12,7/19/12,46,44,10,0,Live Phone,Likely Voters
 CO,Purple Strategies,600,7/16/12,7/19/12,45,44,11,0,Live Phone,Likely Voters
 FL,Purple Strategies,600,7/16/12,7/19/12,45,48,7,0,Live Phone,Likely Voters
@@ -323,11 +323,11 @@ AL,Research Consultants,600,8/1/12,8/4/12,34,59,7,0,Live Phone,Registered Voters
 NJ,Fairleigh Dickinson U.,945,8/2/12,8/5/12,49,36,15,0,Live Phone,Registered Voters
 NC,Rasmussen,500,8/2/12,8/5/12,44,49,7,0,Live Phone,Likely Voters
 WA,SurveyUSA,524,8/3/12,8/6/12,54,37,9,0,Live Phone,Likely Voters
---,Gallup Tracking,3050,8/1/12,8/6/12,47,46,2,4,Live Phone,Likely Voters
+--,Gallup ,3050,8/1/12,8/6/12,47,46,2,4,Live Phone,Likely Voters
 SD,Nielson Brothers,546,8/3/12,8/6/12,43,49,8,0,Live Phone,Registered Voters
 --,Reuters/Ipsos,1014,8/2/12,8/7/12,49,42,2,6,Live Phone,Likely Voters
 --,Daily Kos & SEIU/PPP,1000,8/2/12,8/7/12,48,46,0,4,Live Phone,Likely Voters
---,Rasmussen Tracking,1500,8/3/12,8/8/12,47,45,2,4,Live Phone,Likely Voters
+--,Rasmussen ,1500,8/3/12,8/8/12,47,45,2,4,Live Phone,Likely Voters
 IN,Rasmussen,400,8/5/12,8/8/12,35,51,14,0,Live Phone,Likely Voters
 CO,Public Policy,779,8/7/12,8/10/12,49,43,8,0,Live Phone,Likely Voters
 NC,Public Policy,813,8/7/12,8/10/12,49,46,5,0,Live Phone,Likely Voters
@@ -341,16 +341,16 @@ VA,Rasmussen,500,8/8/12,8/11/12,48,46,6,0,Live Phone,Likely Voters
 CO,Quinnipiac,1463,8/8/12,8/11/12,45,50,5,0,Live Phone,Likely Voters
 --,CNN/Opinion Research,911,8/7/12,8/12/12,52,45,0,2,Live Phone,Likely Voters
 --,IBD/CSM/TIPP,828,8/8/12,8/13/12,46,39,4,10,Live Phone,Likely Voters
---,Gallup Tracking,3050,8/8/12,8/13/12,45,47,2,4,Live Phone,Likely Voters
+--,Gallup ,3050,8/8/12,8/13/12,45,47,2,4,Live Phone,Likely Voters
 IA,Rasmussen,500,8/10/12,8/13/12,44,46,10,0,Live Phone,Likely Voters
 MO,Chilenski Strategies,663,8/12/12,8/15/12,47,48,5,0,Live Phone,Likely Voters
 MO,SurveyUSA,585,8/12/12,8/15/12,44,45,11,0,Live Phone,Likely Voters
 NH,Granite State Poll - Univ. of NH,555,8/13/12,8/16/12,49,46,5,0,Live Phone,Likely Voters
---,The Economist/YouGov,1000,8/11/12,8/16/12,47,43,2,6,Live Phone,Likely Voters
+--,YouGov,1000,8/11/12,8/16/12,47,43,2,6,Live Phone,Likely Voters
 NH,Public Policy,1055,8/14/12,8/17/12,51,45,4,0,Live Phone,Likely Voters
 OH,Public Policy,961,8/14/12,8/17/12,48,45,7,0,Live Phone,Likely Voters
 OH,Rasmussen,500,8/14/12,8/17/12,45,45,10,0,Live Phone,Likely Voters
---,Rasmussen Tracking,1500,8/12/12,8/17/12,43,47,2,6,Live Phone,Likely Voters
+--,Rasmussen ,1500,8/12/12,8/17/12,43,47,2,6,Live Phone,Likely Voters
 CO,Purple Strategies,600,8/15/12,8/18/12,49,46,5,0,Live Phone,Likely Voters
 --,LA Times/USC,1009,8/13/12,8/18/12,48,45,2,4,Live Phone,Likely Voters
 FL,Purple Strategies,600,8/15/12,8/18/12,47,48,5,0,Live Phone,Likely Voters
@@ -397,15 +397,15 @@ VA,Rasmussen,500,8/24/12,8/27/12,47,47,6,0,Live Phone,Likely Voters
 --,CBS News,1051,8/22/12,8/27/12,46,45,2,6,Live Phone,Likely Voters
 PA,Philadelphia Inquirer,601,8/25/12,8/28/12,51,42,7,0,Live Phone,Likely Voters
 --,Democracy Corps.,1000,8/23/12,8/28/12,49,47,0,2,Live Phone,Likely Voters
---,Rasmussen Tracking[permanent dead link],1500,8/23/12,8/28/12,44,45,2,6,Live Phone,Likely Voters
+--,Rasmussen [permanent dead link],1500,8/23/12,8/28/12,44,45,2,6,Live Phone,Likely Voters
 MO,Mason-Dixon,625,8/25/12,8/28/12,43,50,7,0,Live Phone,Registered Voters
 MA,Kimball Political Consulting,592,8/26/12,8/29/12,52,41,7,0,Live Phone,Likely Voters
---,Gallup Tracking,3050,8/24/12,8/29/12,47,46,2,4,Live Phone,Likely Voters
+--,Gallup ,3050,8/24/12,8/29/12,47,46,2,4,Live Phone,Likely Voters
 MO,Gravis Marketing,1057,8/26/12,8/29/12,36,53,11,0,Live Phone,Registered Voters
 FL,CNN/Time/ORC,776,8/27/12,8/30/12,50,46,4,0,Live Phone,Likely Voters
 MI,Mitchell Research,1277,8/27/12,8/30/12,47,47,6,0,Live Phone,Likely Voters
 NC,CNN/Time/ORC,766,8/27/12,8/30/12,47,48,5,0,Live Phone,Likely Voters
---,The Economist/YouGov,1000,8/25/12,8/30/12,46,47,2,4,Live Phone,Likely Voters
+--,YouGov,1000,8/25/12,8/30/12,46,47,2,4,Live Phone,Likely Voters
 OH,Columbus Dispatch,1758,8/27/12,8/30/12,45,45,10,0,Live Phone,Likely Voters
 NC,SurveyUSA,540,8/27/12,8/30/12,43,43,14,0,Live Phone,Registered Voters
 --,Reuters/Ipsos,1545,8/25/12,8/30/12,42,40,4,12,Live Phone,Likely Voters
@@ -431,12 +431,12 @@ FL,Gravis Marketing,1288,9/4/12,9/7/12,47,48,5,0,Live Phone,Likely Voters
 OH,Gravis Marketing,1381,9/5/12,9/8/12,44,47,9,0,Live Phone,Registered Voters
 NJ,Quinnipiac,1471,9/6/12,9/9/12,51,44,5,0,Live Phone,Likely Voters
 --,IBD/TIFF/Christian Science Monitor,808,9/4/12,9/9/12,46,44,2,6,Live Phone,Likely Voters
---,Gallup Tracking,3050,9/6/12,9/11/12,50,44,0,4,Live Phone,Likely Voters
---,Ipsos/Reuters Tracking,1434,9/6/12,9/11/12,45,41,4,8,Live Phone,Likely Voters
+--,Gallup ,3050,9/6/12,9/11/12,50,44,0,4,Live Phone,Likely Voters
+--,Ipsos/Reuters ,1434,9/6/12,9/11/12,45,41,4,8,Live Phone,Likely Voters
 --,CNN/Opinion Research,875,9/7/12,9/12/12,53,45,0,0,Live Phone,Likely Voters
 --,Esquire/Yahoo! News,1000,9/7/12,9/12/12,52,41,2,4,Live Phone,Likely Voters
 OH,Public Policy,1072,9/9/12,9/12/12,50,45,5,0,Live Phone,Likely Voters
---,ABC/Washington Post,826,9/7/12,9/12/12,50,44,0,4,Live Phone,Likely Voters
+--,ABC News/Washington Post,826,9/7/12,9/12/12,50,44,0,4,Live Phone,Likely Voters
 --,Daily Kos/PPP,1000,9/7/12,9/12/12,50,44,0,4,Live Phone,Likely Voters
 NM,Albuquerque Journal,667,9/9/12,9/12/12,45,40,15,0,Live Phone,Likely Voters
 MA,Kimball Political Consulting,756,9/10/12,9/13/12,56,40,4,0,Live Phone,Likely Voters
@@ -444,9 +444,9 @@ WA,SurveyUSA,524,9/10/12,9/13/12,54,38,8,0,Live Phone,Likely Voters
 --,CBS/New York Times,1170,9/8/12,9/13/12,51,43,0,4,Live Phone,Likely Voters
 --,Democracy Corps,1000,9/8/12,9/13/12,50,45,0,2,Live Phone,Likely Voters
 NC,Public Policy,1087,9/10/12,9/13/12,49,48,3,0,Live Phone,Likely Voters
---,YouGov/The Economist,1000,9/8/12,9/13/12,49,45,0,4,Live Phone,Likely Voters
+--,YouGov/The YouGov,1000,9/8/12,9/13/12,49,45,0,4,Live Phone,Likely Voters
 --,UPI/CVOTER,3000,9/8/12,9/13/12,49,45,0,4,Live Phone,Likely Voters
---,Rasmussen Tracking,1500,9/8/12,9/13/12,46,45,2,6,Live Phone,Likely Voters
+--,Rasmussen ,1500,9/8/12,9/13/12,46,45,2,6,Live Phone,Likely Voters
 NC,Civitas,500,9/10/12,9/13/12,43,53,4,0,Live Phone,Registered Voters
 IL,We Ask America,1382,9/11/12,9/14/12,54,37,9,0,Live Phone,Likely Voters
 MN,SurveyUSA,551,9/11/12,9/14/12,50,40,10,0,Live Phone,Likely Voters
@@ -547,7 +547,7 @@ NC,YouGov,1161,9/20/12,9/23/12,46,46,8,0,Live Phone,Registered Voters
 FL,Cadell | McLaughlin,600,9/20/12,9/23/12,44,48,8,0,Live Phone,Likely Voters
 IA,Rasmussen,500,9/20/12,9/23/12,44,47,9,0,Live Phone,Likely Voters
 CA,PPIC,995,9/21/12,9/24/12,53,39,8,0,Live Phone,Likely Voters
---,Gallup Tracking,3050,9/19/12,9/24/12,50,44,0,4,Live Phone,Likely Voters
+--,Gallup ,3050,9/19/12,9/24/12,50,44,0,4,Live Phone,Likely Voters
 CO,Purple Strategies,600,9/21/12,9/24/12,48,45,7,0,Live Phone,Likely Voters
 NC,Purple Strategies,600,9/21/12,9/24/12,48,46,6,0,Live Phone,Likely Voters
 OH,Purple Strategies,600,9/21/12,9/24/12,48,44,8,0,Live Phone,Likely Voters
@@ -602,7 +602,7 @@ NE,Wiese Research,800,9/24/12,9/27/12,40,51,9,0,Live Phone,Registered Voters
 NJ,Monmouth University,715,9/25/12,9/28/12,52,37,11,0,Live Phone,Registered Voters
 OH,Washington Post,759,9/25/12,9/28/12,52,44,4,0,Live Phone,Likely Voters
 FL,Washington Post,769,9/25/12,9/28/12,51,47,2,0,Live Phone,Likely Voters
---,Rasmussen Tracking,1500,9/23/12,9/28/12,46,46,2,4,Live Phone,Likely Voters
+--,Rasmussen ,1500,9/23/12,9/28/12,46,46,2,4,Live Phone,Likely Voters
 OH,Gravis Marketing,594,9/25/12,9/28/12,45,44,11,0,Live Phone,Likely Voters
 AR,Talk Business / Hendrix College,2228,9/25/12,9/28/12,35,56,9,0,Live Phone,Likely Voters
 MA,Rasmussen,500,9/26/12,9/29/12,55,40,5,0,Live Phone,Likely Voters
@@ -636,7 +636,7 @@ MI,Gravis Marketing,804,9/28/12,10/1/12,50,46,4,0,Live Phone,Likely Voters
 NH,American Research Group,600,9/28/12,10/1/12,50,45,5,0,Live Phone,Likely Voters
 PA,Morning Call/Muhlenberg,427,9/28/12,10/1/12,49,42,9,0,Live Phone,Likely Voters
 VA,American Research Group,600,9/28/12,10/1/12,49,47,4,0,Live Phone,Likely Voters
---,ABC News/Wash Post,929,9/26/12,10/1/12,49,44,2,4,Live Phone,Likely Voters
+--,ABC News/Washington Post,929,9/26/12,10/1/12,49,44,2,4,Live Phone,Likely Voters
 --,Fox News,1208,9/26/12,10/1/12,49,41,2,6,Live Phone,Likely Voters
 NM,Public Policy,3111,9/29/12,10/2/12,52,43,5,0,Live Phone,Likely Voters
 PA,Public Policy,2051,9/29/12,10/2/12,52,40,8,0,Live Phone,Likely Voters
@@ -698,7 +698,7 @@ OH,We Ask America,1200,10/5/12,10/8/12,46,47,7,0,Live Phone,Likely Voters
 VA,We Ask America,1200,10/5/12,10/8/12,45,48,7,0,Live Phone,Likely Voters
 WI,Public Policy,979,10/6/12,10/9/12,49,47,4,0,Live Phone,Likely Voters
 --,PPP/Daily Kos & SEIU,1300,10/4/12,10/9/12,47,49,0,2,Live Phone,Likely Voters
---,Gallup Tracking,1387,10/4/12,10/9/12,47,47,0,4,Live Phone,Likely Voters
+--,Gallup ,1387,10/4/12,10/9/12,47,47,0,4,Live Phone,Likely Voters
 --,Rasmussen Reports,1500,10/4/12,10/9/12,47,49,0,2,Live Phone,Likely Voters
 CO,Gravis Marketing,1438,10/6/12,10/9/12,46,49,5,0,Live Phone,Likely Voters
 --,Investor's Business Daily/TIPP,812,10/4/12,10/9/12,46,47,2,4,Live Phone,Likely Voters
@@ -760,18 +760,18 @@ OH,Pulse Opinion Research,1000,10/11/12,10/14/12,47,46,7,0,Live Phone,Likely Vot
 PA,Pulse Opinion Research,1000,10/11/12,10/14/12,47,45,8,0,Live Phone,Likely Voters
 VA,NBC/WSJ/Marist,981,10/11/12,10/14/12,47,48,5,0,Live Phone,Likely Voters
 MI,Gravis Marketing,1122,10/11/12,10/14/12,46,44,10,0,Live Phone,Likely Voters
---,Gallup Tracking,2700,10/9/12,10/14/12,46,50,0,2,Live Phone,Likely Voters
+--,Gallup ,2700,10/9/12,10/14/12,46,50,0,2,Live Phone,Likely Voters
 OH,Gravis Marketing,1313,10/11/12,10/14/12,45,46,9,0,Live Phone,Likely Voters
 FL,Mason-Dixon,800,10/11/12,10/14/12,44,51,5,0,Live Phone,Registered Voters
 MT,Montana State University,477,10/11/12,10/14/12,35,49,16,0,Live Phone,Registered Voters
 CA,CBRT Pepperdine,830,10/12/12,10/15/12,54,33,13,0,Live Phone,Likely Voters
 MI,Rasmussen,500,10/12/12,10/15/12,52,45,3,0,Live Phone,Likely Voters
---,Washington Post-ABC News,923,10/10/12,10/15/12,49,46,0,2,Live Phone,Likely Voters
+--,ABC News/Washington Post,923,10/10/12,10/15/12,49,46,0,2,Live Phone,Likely Voters
 CO,SurveyUSA,614,10/12/12,10/15/12,47,48,5,0,Live Phone,Likely Voters
 FL,Rasmussen,500,10/12/12,10/15/12,47,51,2,0,Live Phone,Likely Voters
 VA,Rasmussen,500,10/12/12,10/15/12,47,49,4,0,Live Phone,Likely Voters
 --,Angus Reid Public Opinion[permanent dead link],906,10/10/12,10/15/12,47,47,0,4,Live Phone,Likely Voters
---,IBD/TIPP Tracking,931,10/10/12,10/15/12,47,45,2,4,Live Phone,Likely Voters
+--,IBD/TIPP ,931,10/10/12,10/15/12,47,45,2,4,Live Phone,Likely Voters
 FL,American Research Group,600,10/12/12,10/15/12,46,49,5,0,Live Phone,Likely Voters
 NH,American Research Group,600,10/12/12,10/15/12,46,50,4,0,Live Phone,Likely Voters
 --,UConn/Hartford Courant,1023,10/11/12,10/16/12,48,45,2,4,Live Phone,Likely Voters
@@ -822,7 +822,7 @@ NC,YouGov,810,10/16/12,10/19/12,48,49,3,0,Live Phone,Likely Voters
 CO,We Ask America,1206,10/16/12,10/19/12,47,48,5,0,Live Phone,Likely Voters
 NH,Suffolk University,500,10/16/12,10/19/12,47,47,6,0,Live Phone,Likely Voters
 VA,YouGov,743,10/16/12,10/19/12,46,45,9,0,Live Phone,Likely Voters
---,Gallup Tracking,2700,10/14/12,10/19/12,45,52,0,2,Live Phone,Likely Voters
+--,Gallup ,2700,10/14/12,10/19/12,45,52,0,2,Live Phone,Likely Voters
 GA,YouGov,777,10/16/12,10/19/12,44,52,4,0,Live Phone,Likely Voters
 AZ,YouGov,469,10/16/12,10/19/12,43,52,5,0,Live Phone,Likely Voters
 TN,YouGov,484,10/16/12,10/19/12,43,52,5,0,Live Phone,Likely Voters
@@ -865,7 +865,7 @@ NH,Public Policy,1036,10/19/12,10/22/12,48,49,3,0,Live Phone,Likely Voters
 --,CBS News,790,10/17/12,10/22/12,48,46,0,4,Live Phone,Likely Voters
 NC,Project New America,500,10/19/12,10/22/12,47,44,9,0,Live Phone,Likely Voters
 VA,Rasmussen,750,10/19/12,10/22/12,47,50,3,0,Live Phone,Likely Voters
---,NBC News/Wall Street Journal,816,10/17/12,10/22/12,47,47,0,4,Live Phone,Likely Voters
+--,NBC/WSJ,816,10/17/12,10/22/12,47,47,0,4,Live Phone,Likely Voters
 --,IBD/TIPP,938,10/17/12,10/22/12,47,45,2,4,Live Phone,Likely Voters
 FL,Rasmussen,750,10/19/12,10/22/12,46,51,3,0,Live Phone,Likely Voters
 OH,Fox News,1131,10/19/12,10/22/12,46,43,11,0,Live Phone,Likely Voters
@@ -875,7 +875,7 @@ NJ,SurveyUSA,577,10/20/12,10/23/12,54,40,6,0,Live Phone,Likely Voters
 --,Washington Times/JZ Analytics,800,10/18/12,10/23/12,50,47,0,2,Live Phone,Likely Voters
 OH,Public Policy,532,10/20/12,10/23/12,49,48,3,0,Live Phone,Likely Voters
 VA,Public Policy,500,10/20/12,10/23/12,49,47,4,0,Live Phone,Likely Voters
---,ABC News/Wash Post,1376,10/18/12,10/23/12,49,48,0,2,Live Phone,Likely Voters
+--,ABC News/Washington Post,1376,10/18/12,10/23/12,49,48,0,2,Live Phone,Likely Voters
 FL,SurveyUSA,600,10/20/12,10/23/12,47,46,7,0,Live Phone,Likely Voters
 OH,Gravis Marketing,1943,10/20/12,10/23/12,47,47,6,0,Live Phone,Likely Voters
 --,Monmouth/SurveyUSA/Braun,1402,10/18/12,10/23/12,45,48,2,4,Live Phone,Likely Voters
@@ -893,7 +893,7 @@ PA,Gravis Marketing,887,10/22/12,10/25/12,48,45,7,0,Live Phone,Likely Voters
 OH,Suffolk University,600,10/22/12,10/25/12,47,47,6,0,Live Phone,Likely Voters
 CO,Rasmussen,500,10/22/12,10/25/12,46,50,4,0,Live Phone,Likely Voters
 MO,Public Policy,582,10/22/12,10/25/12,46,52,2,0,Live Phone,Likely Voters
---,Rasmussen Tracking,1500,10/20/12,10/25/12,46,50,0,2,Live Phone,Likely Voters
+--,Rasmussen ,1500,10/20/12,10/25/12,46,50,0,2,Live Phone,Likely Voters
 ND,Rasmussen,600,10/22/12,10/25/12,40,54,6,0,Live Phone,Likely Voters
 CT,SurveyUSA,575,10/23/12,10/26/12,53,40,7,0,Live Phone,Likely Voters
 NJ,Stockton College,811,10/23/12,10/26/12,53,38,9,0,Live Phone,Likely Voters
@@ -915,7 +915,7 @@ OH,TIME,783,10/24/12,10/27/12,49,44,7,0,Live Phone,Likely Voters
 --,PPP/Americans United for Change,1200,10/22/12,10/27/12,49,48,0,2,Live Phone,Likely Voters
 NH,Rasmussen,500,10/24/12,10/27/12,48,50,2,0,Live Phone,Likely Voters
 OH,Rasmussen,750,10/24/12,10/27/12,48,48,4,0,Live Phone,Likely Voters
---,Gallup Tracking,3050,10/22/12,10/27/12,48,48,0,2,Live Phone,Likely Voters
+--,Gallup ,3050,10/22/12,10/27/12,48,48,0,2,Live Phone,Likely Voters
 OH,SurveyUSA,609,10/24/12,10/27/12,47,44,9,0,Live Phone,Likely Voters
 --,High Point University,805,10/22/12,10/27/12,46,43,2,6,Live Phone,Likely Voters
 --,Investor's Business Daily/TIPP,942,10/22/12,10/27/12,45,44,2,6,Live Phone,Likely Voters
@@ -978,7 +978,7 @@ OH,Gravis Marketing,730,10/28/12,10/31/12,50,49,1,0,Live Phone,Likely Voters
 FL,Public Policy,687,10/28/12,10/31/12,49,48,3,0,Live Phone,Likely Voters
 NH,Public Policy,874,10/28/12,10/31/12,49,47,4,0,Live Phone,Likely Voters
 OH,Ohio Newspaper Poll,1015,10/28/12,10/31/12,49,49,2,0,Live Phone,Likely Voters
---,YouGov/The Economist,757,10/26/12,10/31/12,48,46,0,4,Live Phone,Likely Voters
+--,YouGov/The YouGov,757,10/26/12,10/31/12,48,46,0,4,Live Phone,Likely Voters
 MN,Mason-Dixon,800,10/28/12,10/31/12,47,44,9,0,Live Phone,Likely Voters
 NE,Wiese Research (2nd CD Only),800,10/28/12,10/31/12,44,49,7,0,Live Phone,Registered Voters
 NE,Wiese Research,800,10/28/12,10/31/12,38,52,10,0,Live Phone,Registered Voters
@@ -987,10 +987,10 @@ MA,Boston Globe,583,10/29/12,11/1/12,52,38,10,0,Live Phone,Likely Voters
 FL,CNN | ORC,770,10/29/12,11/1/12,49,50,1,0,Live Phone,Likely Voters
 OH,Rasmussen,750,10/29/12,11/1/12,48,50,2,0,Live Phone,Likely Voters
 CO,American Research Group,600,10/29/12,11/1/12,47,48,5,0,Live Phone,Likely Voters
---,Rasmussen Tracking,1500,10/27/12,11/1/12,47,49,0,2,Live Phone,Likely Voters
+--,Rasmussen ,1500,10/27/12,11/1/12,47,49,0,2,Live Phone,Likely Voters
 NC,Elon University,1238,10/29/12,11/1/12,45,45,10,0,Live Phone,Likely Voters
 NY,SurveyUSA,554,10/30/12,11/2/12,62,33,5,0,Live Phone,Likely Voters
---,ABC News/Wash Post,1293,10/28/12,11/2/12,49,48,0,2,Live Phone,Likely Voters
+--,ABC News/Washington Post,1293,10/28/12,11/2/12,49,48,0,2,Live Phone,Likely Voters
 FL,SurveyUSA,595,10/30/12,11/2/12,47,47,6,0,Live Phone,Likely Voters
 OR,Elway Research,405,10/30/12,11/2/12,47,41,12,0,Live Phone,Likely Voters
 --,Fox News,1230,10/28/12,11/2/12,46,45,2,6,Live Phone,Likely Voters
@@ -1035,15 +1035,15 @@ MN,SurveyUSA,574,11/1/12,11/4/12,50,43,7,0,Live Phone,Likely Voters
 NV,SurveyUSA,1212,11/1/12,11/4/12,50,46,4,0,Live Phone,Likely Voters
 NH,NBC/WSJ/Marist,1013,11/1/12,11/4/12,49,47,4,0,Live Phone,Likely Voters
 VA,Public Policy,600,11/1/12,11/4/12,49,46,5,0,Live Phone,Likely Voters
-VA,Reuters Ipsos,792,11/1/12,11/4/12,49,44,7,0,Live Phone,Likely Voters
+VA,Ipsos/Reuters,792,11/1/12,11/4/12,49,44,7,0,Live Phone,Likely Voters
 WI,Rasmussen,750,11/1/12,11/4/12,49,49,2,0,Live Phone,Likely Voters
 WI,NBC/WSJ/Marist,1065,11/1/12,11/4/12,49,46,5,0,Live Phone,Likely Voters
 --,PPP/Americans United for Change,1200,10/30/12,11/4/12,49,48,0,2,Live Phone,Likely Voters
-FL,Reuters Ipsos,897,11/1/12,11/4/12,48,46,6,0,Live Phone,Likely Voters
+FL,Ipsos/Reuters,897,11/1/12,11/4/12,48,46,6,0,Live Phone,Likely Voters
 IA,Rasmussen,750,11/1/12,11/4/12,48,49,3,0,Live Phone,Likely Voters
 CO,Rasmussen,750,11/1/12,11/4/12,47,50,3,0,Live Phone,Likely Voters
-OH,Reuters Ipsos,936,11/1/12,11/4/12,47,45,8,0,Live Phone,Likely Voters
-CO,Reuters Ipsos,694,11/1/12,11/4/12,46,47,7,0,Live Phone,Likely Voters
+OH,Ipsos/Reuters,936,11/1/12,11/4/12,47,45,8,0,Live Phone,Likely Voters
+CO,Ipsos/Reuters,694,11/1/12,11/4/12,46,47,7,0,Live Phone,Likely Voters
 HI,Merriman River Group,1218,11/2/12,11/5/12,61,34,5,0,Live Phone,Likely Voters
 ME,Public Policy,1633,11/2/12,11/5/12,55,42,3,0,Live Phone,Likely Voters
 MN,Public Policy,772,11/2/12,11/5/12,53,44,3,0,Live Phone,Likely Voters
@@ -1064,12 +1064,12 @@ VA,We Ask America,1069,11/2/12,11/5/12,49,48,3,0,Live Phone,Likely Voters
 --,ABC News/Washington Post,2069,10/31/12,11/5/12,49,48,0,2,Live Phone,Likely Voters
 --,Pew,3151,10/31/12,11/5/12,49,42,2,6,Live Phone,Likely Voters
 --,YouGov,6000,10/31/12,11/5/12,49,47,0,2,Live Phone,Likely Voters
-FL,Reuters Ipsos,985,11/2/12,11/5/12,48,46,6,0,Live Phone,Likely Voters
-VA,Reuters Ipsos,1065,11/2/12,11/5/12,48,45,7,0,Live Phone,Likely Voters
+FL,Ipsos/Reuters,985,11/2/12,11/5/12,48,46,6,0,Live Phone,Likely Voters
+VA,Ipsos/Reuters,1065,11/2/12,11/5/12,48,45,7,0,Live Phone,Likely Voters
 --,Ipsos/Reuters,5158,10/31/12,11/5/12,48,42,2,6,Live Phone,Likely Voters
 CO,SurveyUSA,695,11/2/12,11/5/12,47,45,8,0,Live Phone,Likely Voters
-OH,Reuters Ipsos,1012,11/2/12,11/5/12,47,45,8,0,Live Phone,Likely Voters
-CO,Reuters Ipsos,1052,11/2/12,11/5/12,46,46,8,0,Live Phone,Likely Voters
+OH,Ipsos/Reuters,1012,11/2/12,11/5/12,47,45,8,0,Live Phone,Likely Voters
+CO,Ipsos/Reuters,1052,11/2/12,11/5/12,46,46,8,0,Live Phone,Likely Voters
 NC,High Point University,403,11/2/12,11/5/12,45,46,9,0,Live Phone,Likely Voters
 IN,Howey / DePauw,800,11/2/12,11/5/12,41,50,9,0,Live Phone,Likely Voters
 NE,We Ask America,1178,11/2/12,11/5/12,41,54,5,0,Live Phone,Likely Voters
@@ -1113,11 +1113,11 @@ NH,Granite State Poll - Univ. of NH,789,11/5/12,11/6/12,50,46,4,0,Live Phone,Lik
 NH,New England College,687,11/5/12,11/6/12,50,46,4,0,Live Phone,Likely Voters
 NH,Rasmussen,750,11/5/12,11/6/12,50,48,2,0,Live Phone,Likely Voters
 OH,Ohio Poll,889,11/5/12,11/6/12,50,49,1,0,Live Phone,Likely Voters
-OH,Reuters Ipsos,680,11/5/12,11/6/12,50,46,4,0,Live Phone,Likely Voters
+OH,Ipsos/Reuters,680,11/5/12,11/6/12,50,46,4,0,Live Phone,Likely Voters
 FL,NBC/WSJ/Marist,1545,11/3/12,11/6/12,49,47,4,0,Live Phone,Likely Voters
 --,Democracy Corps,1080,11/1/12,11/6/12,49,45,0,4,Live Phone,Likely Voters
---,Gallup Tracking,2854,11/1/12,11/6/12,49,46,0,2,Live Phone,Likely Voters
---,Rasmussen Tracking,3000,11/1/12,11/6/12,49,49,0,0,Live Phone,Likely Voters
+--,Gallup ,2854,11/1/12,11/6/12,49,46,0,2,Live Phone,Likely Voters
+--,Rasmussen ,3000,11/1/12,11/6/12,49,49,0,0,Live Phone,Likely Voters
 ME,Critical Insights,613,11/4/12,11/6/12,49,42,9,0,Live Phone,Likely Voters
 NM,YouGov,650,11/4/12,11/6/12,49,43,8,0,Live Phone,Likely Voters
 NV,YouGov,732,11/4/12,11/6/12,49,45,6,0,Live Phone,Likely Voters
@@ -1131,34 +1131,34 @@ OH,SurveyUSA,803,11/5/12,11/6/12,49,44,7,0,Live Phone,Likely Voters
 OH,Gravis Marketing,1316,11/5/12,11/6/12,49,48,3,0,Live Phone,Likely Voters
 PA,Gravis Marketing,1060,11/5/12,11/6/12,49,46,5,0,Live Phone,Likely Voters
 NH,Granite State Poll - Univ. of NH,502,11/3/12,11/6/12,48,48,4,0,Live Phone,Likely Voters
-VA,Reuters Ipsos,947,11/3/12,11/6/12,48,45,7,0,Live Phone,Likely Voters
---,NBC News/Wall Street Journal,1475,11/1/12,11/6/12,48,47,0,2,Live Phone,Likely Voters
-CO,Reuters Ipsos,676,11/4/12,11/6/12,48,48,4,0,Live Phone,Likely Voters
+VA,Ipsos/Reuters,947,11/3/12,11/6/12,48,45,7,0,Live Phone,Likely Voters
+--,NBC/WSJ,1475,11/1/12,11/6/12,48,47,0,2,Live Phone,Likely Voters
+CO,Ipsos/Reuters,676,11/4/12,11/6/12,48,48,4,0,Live Phone,Likely Voters
 CO,YouGov,752,11/4/12,11/6/12,48,47,5,0,Live Phone,Likely Voters
 IA,YouGov,1040,11/4/12,11/6/12,48,47,5,0,Live Phone,Likely Voters
-OH,Reuters Ipsos,712,11/4/12,11/6/12,48,44,8,0,Live Phone,Likely Voters
+OH,Ipsos/Reuters,712,11/4/12,11/6/12,48,44,8,0,Live Phone,Likely Voters
 VA,YouGov,1497,11/4/12,11/6/12,48,46,6,0,Live Phone,Likely Voters
---,Rasmussen Tracking,1500,11/2/12,11/6/12,48,49,0,2,Live Phone,Likely Voters
-CO,Reuters Ipsos,774,11/5/12,11/6/12,48,47,5,0,Live Phone,Likely Voters
+--,Rasmussen ,1500,11/2/12,11/6/12,48,49,0,2,Live Phone,Likely Voters
+CO,Ipsos/Reuters,774,11/5/12,11/6/12,48,47,5,0,Live Phone,Likely Voters
 IA,American Research Group,600,11/5/12,11/6/12,48,49,3,0,Live Phone,Likely Voters
 VA,NBC/WSJ/Marist,1165,11/5/12,11/6/12,48,47,5,0,Live Phone,Likely Voters
 VA,Rasmussen,750,11/5/12,11/6/12,48,50,2,0,Live Phone,Likely Voters
-VA,Reuters Ipsos,828,11/5/12,11/6/12,48,46,6,0,Live Phone,Likely Voters
-FL,Reuters Ipsos,946,11/3/12,11/6/12,47,47,6,0,Live Phone,Likely Voters
+VA,Ipsos/Reuters,828,11/5/12,11/6/12,48,46,6,0,Live Phone,Likely Voters
+FL,Ipsos/Reuters,946,11/3/12,11/6/12,47,47,6,0,Live Phone,Likely Voters
 IA,Selzer & Co.,800,11/3/12,11/6/12,47,42,11,0,Live Phone,Likely Voters
 FL,YouGov,1621,11/4/12,11/6/12,47,48,5,0,Live Phone,Likely Voters
 NC,YouGov,1500,11/4/12,11/6/12,47,49,4,0,Live Phone,Likely Voters
 NH,YouGov,690,11/4/12,11/6/12,47,43,10,0,Live Phone,Likely Voters
 PA,Susquehanna Polling & Research,800,11/4/12,11/6/12,47,47,6,0,Live Phone,Likely Voters
-VA,Reuters Ipsos,662,11/4/12,11/6/12,47,46,7,0,Live Phone,Likely Voters
+VA,Ipsos/Reuters,662,11/4/12,11/6/12,47,46,7,0,Live Phone,Likely Voters
 FL,Insider Advantage,437,11/5/12,11/6/12,47,52,1,0,Live Phone,Registered Voters
-FL,Reuters Ipsos,769,11/5/12,11/6/12,47,48,5,0,Live Phone,Likely Voters
-OH,Reuters Ipsos,1031,11/3/12,11/6/12,46,45,9,0,Live Phone,Likely Voters
+FL,Ipsos/Reuters,769,11/5/12,11/6/12,47,48,5,0,Live Phone,Likely Voters
+OH,Ipsos/Reuters,1031,11/3/12,11/6/12,46,45,9,0,Live Phone,Likely Voters
 AZ,Public Policy,1080,11/4/12,11/6/12,46,53,1,0,Live Phone,Likely Voters
-FL,Reuters Ipsos,743,11/4/12,11/6/12,46,46,8,0,Live Phone,Likely Voters
+FL,Ipsos/Reuters,743,11/4/12,11/6/12,46,46,8,0,Live Phone,Likely Voters
 MI,"Foster, Baydoun",1913,11/4/12,11/6/12,46,47,7,0,Live Phone,Likely Voters
 NC,Gravis Marketing,1130,11/5/12,11/6/12,46,50,4,0,Live Phone,Likely Voters
-CO,Reuters Ipsos,973,11/3/12,11/6/12,45,47,8,0,Live Phone,Likely Voters
+CO,Ipsos/Reuters,973,11/3/12,11/6/12,45,47,8,0,Live Phone,Likely Voters
 FL,Mason-Dixon,800,11/3/12,11/6/12,45,51,4,0,Live Phone,Likely Voters
 MO,Public Policy,835,11/4/12,11/6/12,45,53,2,0,Live Phone,Likely Voters
 MT,Public Policy,836,11/4/12,11/6/12,45,52,3,0,Live Phone,Likely Voters

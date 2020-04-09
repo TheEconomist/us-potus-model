@@ -309,11 +309,9 @@ y <- MASS::mvrnorm(10000, mu_b_prior, Sigma = state_correlation_error)
 mean( inv.logit(apply(y, MARGIN = 2, mean) +  apply(y, MARGIN = 2, sd)) - inv.logit(apply(y, MARGIN = 2, mean)) )
 
 ## adjusts
-## adjusts
 adjusters <- c(
   "ABC",
   "Washington Post",
-  "IBD",
   "Ipsos",
   "Pew",
   "YouGov",

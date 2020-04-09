@@ -255,7 +255,6 @@ alpha_prior <- log(states2012$national_score[1]/score_among_polled)
 adjusters <- c(
   "ABC",
   "Washington Post",
-  "IBD",
   "Ipsos",
   "Pew",
   "YouGov",

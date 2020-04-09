@@ -285,10 +285,11 @@ map.2008.gg <- urbnmapr::states %>%
   left_join(p_obama %>% filter(t == max(t)) %>%
               select(state_abbv=state,prob)) %>%
   ggplot(aes(x=long,y=lat,group=group,fill=prob)) +
-  geom_polygon()  + 
+  geom_polygon(col='gray40')  + 
   coord_map("albers",lat0=39, lat1=45) +
-  scale_fill_gradient2(high='blue',low='red',mid='white',midpoint=0.5) +
-  theme_void()
+  scale_fill_gradient2(name='Democratic win probability',high='blue',low='red',mid='gray90',midpoint=0.5) +
+  theme_void() + 
+  theme(legend.position = 'top')
 
 
 # electoral college by simulation
@@ -727,10 +728,11 @@ map.2012.gg <- urbnmapr::states %>%
   left_join(p_obama %>% filter(t == max(t)) %>%
               select(state_abbv=state,prob)) %>%
   ggplot(aes(x=long,y=lat,group=group,fill=prob)) +
-  geom_polygon()  + 
+  geom_polygon(col='gray40')  + 
   coord_map("albers",lat0=39, lat1=45) +
-  scale_fill_gradient2(high='blue',low='red',mid='white',midpoint=0.5) +
-  theme_void()
+  scale_fill_gradient2(name='Democratic win probability',high='blue',low='red',mid='gray90',midpoint=0.5) +
+  theme_void() + 
+  theme(legend.position = 'top')
 
 
 # electoral college by simulation
@@ -1175,10 +1177,11 @@ map.2016.gg <- urbnmapr::states %>%
   left_join(p_clinton %>% filter(t == max(t)) %>%
               select(state_abbv=state,prob)) %>%
   ggplot(aes(x=long,y=lat,group=group,fill=prob)) +
-  geom_polygon()  + 
+  geom_polygon(col='gray40')  + 
   coord_map("albers",lat0=39, lat1=45) +
-  scale_fill_gradient2(high='blue',low='red',mid='white',midpoint=0.5) +
-  theme_void()
+  scale_fill_gradient2(name='Democratic win probability',high='blue',low='red',mid='gray90',midpoint=0.5) +
+  theme_void() + 
+  theme(legend.position = 'top')
 
 
 # electoral college by simulation
