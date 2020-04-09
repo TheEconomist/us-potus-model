@@ -174,9 +174,7 @@ df <- df %>%
     # vote shares
     p_clinton, n_clinton, 
     p_trump, n_trump, 
-<<<<<<< HEAD
     poll_day, index_s, index_p, index_t)
->>>>>>> 5fd18a9c6525a27fdc86290add27fd71574896af
 all_polled_states <- df$state %>% unique %>% sort
 # day indices
 ndays <- max(df$t) - min(df$t)
@@ -266,10 +264,7 @@ adjusters <- c(
 # Passing the data to Stan and running the model ---------
 N_state <- nrow(df %>% filter(index_s != 52))
 N_national <- nrow(df %>% filter(index_s == 52))
-<<<<<<< HEAD
 T <- as.integer(round(difftime(election_day, first_day)))
-=======
->>>>>>> 5fd18a9c6525a27fdc86290add27fd71574896af
 current_T <- max(df$poll_day)
 S <- 51
 P <- length(unique(df$pollster))
@@ -370,7 +365,6 @@ write_rds(out, sprintf('models/stan_model_%s.rds',RUN_DATE),compress = 'gz')
 #out <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
 
 ## --- priors
-<<<<<<< HEAD
 ## mu_b_T
 y <- MASS::mvrnorm(1000, mu_b_prior, Sigma = state_correlation_mu_b_T)
 mu_b_T_posterior_draw <- rstan::extract(out, pars = "mu_b")[[1]][,,254]
@@ -442,7 +436,6 @@ polling_error_plt <- polling_error_draws %>%
     theme_bw()
 
 ## Posterior
->>>>>>> 5fd18a9c6525a27fdc86290add27fd71574896af
 # poll terms
 poll_terms <- rstan::extract(out, pars = "mu_c")[[1]]
 non_adjusters <- df %>% 
