@@ -6,20 +6,19 @@ rm(list = ls())
 options(mc.cores = 2)
 n_iter <- 1000
 n_warmup <- 500
+n_chains <- 2
+n_refresh <- 50
 
 ## Libraries
 {
   library(tidyverse, quietly = TRUE)
   library(rstan, quietly = TRUE)
-  library(purrr, quietly = TRUE)
   library(stringr, quietly = TRUE)
   library(lubridate, quietly = TRUE)
-  library(curl, quietly = TRUE)
-  library(survey, quietly = TRUE)
   library(gridExtra, quietly = TRUE)
   library(pbapply, quietly = TRUE)
   library(boot, quietly = TRUE)
-  library(lqmm, quietly = TRUE)
+  library(lqmm, quietly = TRUE) # make.positive.definite
   library(gridExtra, quietly = TRUE)
   library(ggrepel, quietly = TRUE)
 }
@@ -32,6 +31,15 @@ cov_matrix <- function(n, sigma2, rho){
     diag(m) <- 1
     (sigma2^.5 * diag(n))  %*% m %*% (sigma2^.5 * diag(n))
 }
+mean_low_high <- function(draws, states, id){
+  tmp <- draws
+  draws_df <- data.frame(mean = inv.logit(apply(tmp, MARGIN = 2, mean)),
+                                  high = inv.logit(apply(tmp, MARGIN = 2, mean) + 1.96 * apply(tmp, MARGIN = 2, sd)), 
+                                  low  = inv.logit(apply(tmp, MARGIN = 2, mean) - 1.96 * apply(tmp, MARGIN = 2, sd)),
+                               state = states, 
+                                type = id)
+  return(draws_df) 
+}
 
 ## Master variables
 RUN_DATE <- min(ymd('2016-11-08'),Sys.Date())
@@ -41,8 +49,6 @@ start_date <- as.Date("2016-03-01") # Keeping all polls after March 1, 2016
 
 
 # wrangle polls -----------------------------------------------------------
-# read
-#setwd(here("data/"))
 all_polls <- read.csv("data/all_polls.csv", stringsAsFactors = FALSE, header = TRUE)
 
 # select relevant columns from HufFPost polls
@@ -50,12 +56,8 @@ all_polls <- all_polls %>%
   dplyr::select(state, pollster, number.of.observations, population, mode, 
                 start.date, 
                 end.date,
-                clinton, trump, undecided, other, johnson, mcmullin)
-
-# make sure we've got nothing from the futuree
-all_polls <- all_polls %>%
+                clinton, trump, undecided, other, johnson, mcmullin) %>%
   filter(ymd(end.date) <= RUN_DATE)
-
 
 # basic mutations
 df <- all_polls %>% 
@@ -76,6 +78,8 @@ df <- df %>%
          pollster = replace(pollster, pollster == "Fox News", "FOX"), # Fixing inconsistencies in pollster names
          pollster = replace(pollster, pollster == "WashPost", "Washington Post"),
          pollster = replace(pollster, pollster == "ABC News", "ABC"),
+         pollster = replace(pollster, pollster == "DHM Research", "DHM"),
+         pollster = replace(pollster, pollster == "Public Opinion Strategies", "POS"),
          undecided = ifelse(is.na(undecided), 0, undecided),
          other = ifelse(is.na(other), 0, other) + 
            ifelse(is.na(johnson), 0, johnson) + 
@@ -92,13 +96,9 @@ df <- df %>%
          # clinton
          n_clinton = round(n * clinton/100),
          p_clinton = clinton/two_party_sum,
-         # trump
          n_trump = round(n * trump/100),
-         p_trump = trump/two_party_sum,
-         # third-party
-         n_other = round(n * other/100),
-         p_other = other/100)
-
+         p_trump = trump/two_party_sum)
+first_day <- min(df$start.date)
 # prepare stan date -----------------------------------------------------------
 
 ## --- create correlation matrix
@@ -174,8 +174,8 @@ df <- df %>%
     # vote shares
     p_clinton, n_clinton, 
     p_trump, n_trump, 
-    p_other, n_other, poll_day, index_s, index_p, index_t)
-#all_polled_states <- df$state %>% unique %>% sort
+    poll_day, index_s, index_p, index_t)
+all_polled_states <- df$state %>% unique %>% sort
 # day indices
 ndays <- max(df$t) - min(df$t)
 all_t <- min(df$t) + days(0:(ndays))
@@ -264,7 +264,7 @@ adjusters <- c(
 # Passing the data to Stan and running the model ---------
 N_state <- nrow(df %>% filter(index_s != 52))
 N_national <- nrow(df %>% filter(index_s == 52))
-T <- as.integer(round(difftime(election_day, min(df$start.date))))
+T <- as.integer(round(difftime(election_day, first_day)))
 current_T <- max(df$poll_day)
 S <- 51
 P <- length(unique(df$pollster))
@@ -331,10 +331,7 @@ data <- list(
 
 ### Initialization ----
 
-n_chains <- 2
-
 initf2 <- function(chain_id = 1) {
-  # cat("chain_id =", chain_id, "\n")
   list(raw_alpha = abs(rnorm(1)), 
        raw_mu_a = rnorm(current_T),
        raw_mu_b = abs(matrix(rnorm(T * (S)), nrow = S, ncol = T)),
@@ -356,8 +353,8 @@ init_ll <- lapply(1:n_chains, function(id) initf2(chain_id = id))
 #model <- rstan::stan_model("scripts/model/poll_model_2020_no_partisan_correction.stan")
 model <- rstan::stan_model("scripts/model/poll_model_2020.stan")
 out <- rstan::sampling(model, data = data,
-                       refresh=50,
-                       chains = 2, iter = n_iter, warmup = n_warmup, init = init_ll
+                       refresh = n_refresh,
+                       chains  = n_chains, iter = n_iter, warmup = n_warmup, init = init_ll
 )
 
 
@@ -368,19 +365,77 @@ write_rds(out, sprintf('models/stan_model_%s.rds',RUN_DATE),compress = 'gz')
 #out <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
 
 ## --- priors
-y <- MASS::mvrnorm(1000, mu_b_prior, Sigma = state_correlation_error)
-cbind(
-  inv.logit(apply(y, MARGIN = 2, mean)),
-  inv.logit(apply(y, MARGIN = 2, mean) + 1.96 * apply(y, MARGIN = 2, sd)), 
-  inv.logit(apply(y, MARGIN = 2, mean) - 1.96 * apply(y, MARGIN = 2, sd)))
+## mu_b_T
+y <- MASS::mvrnorm(1000, mu_b_prior, Sigma = state_correlation_mu_b_T)
+mu_b_T_posterior_draw <- rstan::extract(out, pars = "mu_b")[[1]][,,254]
+mu_b_T_prior_draws     <- mean_low_high(y, states = colnames(y), id = "prior")
+mu_b_T_posterior_draws <- mean_low_high(mu_b_T_posterior_draw, states = colnames(y), id = "posterior")
+mu_b_T <- rbind(mu_b_T_prior_draws, mu_b_T_posterior_draws)
+mu_b_t_plt <- mu_b_T %>% arrange(mean) %>%
+  ggplot(.) +
+    geom_point(aes(y = mean, x = reorder(state, mean), color = type), position = position_dodge(width = 0.5)) +
+    geom_errorbar(aes(ymin = low, ymax = high, x = state, color = type), width = 0, position = position_dodge(width = 0.5)) +
+    coord_flip() +
+    theme_bw()
+## alpha
+alpha_prior_draws <- data.frame(draws = rnorm(1000, mu_alpha, sigma_alpha), type = "prior")
+alpha_posterior_draws <- data.frame(draws = rstan::extract(out, pars = "alpha")[[1]], type = "posterior")
+alpha_draws <- rbind(alpha_prior_draws, alpha_posterior_draws)
+alpha_plt <- alpha_draws %>%
+  ggplot(., aes(x = draws, fill = type)) +
+  geom_histogram(position = "identity", alpha = 0.6, bins = 60) +
+  theme_bw()
+## mu_c
+mu_c_posterior_draws <- rstan::extract(out, pars = "mu_c")[[1]] 
+mu_c_posterior_draws <- data.frame(draws = as.vector(mu_c_posterior_draws),
+                                   index_p = sort(rep(seq(1, P), dim(mu_c_posterior_draws)[1])), 
+                                   type = "posterior")
+mu_c_prior_draws <- data.frame(draws = rnorm(P * 1000, 0, prior_sigma_c),
+                               index_p = sort(rep(seq(1, P), 1000)), 
+                               type = "prior")
+mu_c_draws <- rbind(mu_c_posterior_draws, mu_c_prior_draws) 
+pollster <- df %>% select(pollster, index_p) %>% distinct()
+mu_c_draws <- merge(mu_c_draws, pollster, by = "index_p", all.x = TRUE)
+mu_c_draws <- mu_c_draws %>%
+  group_by(pollster, type) %>%
+  summarize(mean = mean(draws), 
+            low = mean(draws) - 1.96 * sd(draws),
+            high = mean(draws) + 1.96 * sd(draws))
+mu_c_plt <- mu_c_draws %>% arrange(mean) %>%
+  ggplot(.) +
+    geom_point(aes(y = mean, x = reorder(pollster, mean), color = type), 
+               position = position_dodge(width = 0.5)) +
+    geom_errorbar(aes(ymin = low, ymax = high, x = pollster, color = type), 
+                  width = 0, position = position_dodge(width = 0.5)) +
+    coord_flip() +
+    theme_bw()
+## state error terms
+polling_error_posterior <- rstan::extract(out, pars = "polling_error")[[1]]
+polling_error_posterior_draws <- data.frame(draws = as.vector(polling_error_posterior),
+                                   index_s = sort(rep(seq(1, S), dim(polling_error_posterior)[1])), 
+                                   type = "posterior")
+y <- MASS::mvrnorm(1000, rep(0, S), Sigma = state_correlation_error)
+polling_error_prior_draws <- data.frame(draws = as.vector(y),
+                                   index_s = sort(rep(seq(1, S), dim(y)[1])), 
+                                    type = "prior")
+polling_error_draws <- rbind(polling_error_posterior_draws, polling_error_prior_draws) 
+states <- data.frame(index_s = 1:51, states = rownames(state_correlation_error))
+polling_error_draws <- merge(polling_error_draws, states, by = "index_s", all.x = TRUE)
+polling_error_draws <- polling_error_draws %>%
+  group_by(states, type) %>%
+  summarize(mean = mean(draws), 
+            low = mean(draws) - 1.96 * sd(draws),
+            high = mean(draws) + 1.96 * sd(draws))
+polling_error_plt <- polling_error_draws %>%
+  ggplot(.) +
+    geom_point(aes(y = mean, x = reorder(states, mean), color = type), 
+               position = position_dodge(width = 0.5)) +
+    geom_errorbar(aes(ymin = low, ymax = high, x = states, color = type), 
+                  width = 0, position = position_dodge(width = 0.5)) +
+    coord_flip() +
+    theme_bw()
 
-
-
-
-# etc
-a <- rstan::extract(out, pars = "alpha")[[1]]
-hist(a)
-
+## Posterior
 # poll terms
 poll_terms <- rstan::extract(out, pars = "mu_c")[[1]]
 non_adjusters <- df %>% 
@@ -603,11 +658,14 @@ ggplot(final_evs,aes(x=dem_ev,
 
 # brier scores
 # https://www.buzzfeednews.com/article/jsvine/2016-election-forecast-grades
+ev_state <- enframe(ev_state)
+colnames(ev_state) <- c("state", "ev")
 compare <- p_clinton %>% 
   filter(t==max(t),state!='--') %>% 
   select(state,clinton_win=prob) %>% 
   mutate(clinton_win_actual = ifelse(state %in% c('CA','NV','OR','WA','CO','NM','MN','IL','VA','DC','MD','DE','NJ','CT','RI','MA','NH','VT','NY','HI','ME'),1,0),
-         diff = (clinton_win_actual - clinton_win )^2) %>% left_join(enframe(ev_state) %>% set_names(.,c('state','ev'))) %>% 
+         diff = (clinton_win_actual - clinton_win )^2) %>% 
+  left_join(ev_state) %>% 
   mutate(ev_weight = ev/(sum(ev))) 
 
 
