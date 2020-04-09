@@ -39,9 +39,22 @@ abramowitz <- read.csv('data/abramowitz_data.csv') %>%
   filter(!is.na(ANES_share_swing_voters))
 
 # just a simple linear model
-prior_model <- lm(incvote ~ 
-                    juneapp + q2gdp, 
+prior_model <- lm(incvote ~ juneapp:ANES_share_swing_voters + q2gdp:ANES_share_swing_voters,
                   data = abramowitz)
+
+summary(prior_model)
+
+# heldout national perdictions?
+sapply(abramowitz$year,
+       function(x){
+         temp_train <- abramowitz %>% filter(year != x)
+         temp_test <- abramowitz %>% filter(year == x)
+         
+         temp_model <- lm(incvote ~ juneapp:ANES_share_swing_voters + q2gdp:ANES_share_swing_voters, 
+                          data = temp_train)
+         
+         error <- temp_test$incvote -  predict(temp_model, temp_test)
+       }) %>% rmse
 
 national_preds = tibble(year = abramowitz$year,
                         pred_two_party_national = fitted(prior_model)/100) %>%
@@ -49,7 +62,7 @@ national_preds = tibble(year = abramowitz$year,
                                           1-pred_two_party_national,
                                           pred_two_party_national))
 
-# add to national, generate predictions
+# state-level in-sample predictions?
 results <- results %>%
   left_join(national_preds, by = "year") %>%
   mutate(dem_share_vote_year_prediction = dem_two_party_share_lean_lag + pred_two_party_national,
@@ -59,10 +72,10 @@ rmse(results$dem_share_vote_year_prediction  -  results$dem_two_party_share)
 mean(abs(results$dem_share_vote_year_prediction  -  results$dem_two_party_share),na.rm=T)
 rmse(results$pred_two_party_national  -  results$national_dem_two_party_share)
 
-# what is it out-of-sample?
+# state-level out-of-sample predictions?
 helout_preds <- lapply(abramowitz$year,
        function(x){
-         mod <- lm(incvote ~ q2gdp + juneapp,
+         mod <- lm(incvote ~ juneapp:ANES_share_swing_voters + q2gdp:ANES_share_swing_voters,
                            data = abramowitz[abramowitz$year != x,])
          
          tmp_preds = abramowitz %>%

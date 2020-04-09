@@ -164,7 +164,7 @@ state_correlation[state_correlation < 0] <- 0 # nothing should be negatively cor
 state_correlation <- make.positive.definite(state_correlation)
 
 #state_correlation_error <- state_correlation # covariance for backward walk
-state_correlation_error <- cov_matrix(51, 0.1^2, 0.8) # 0.08^2
+state_correlation_error <- cov_matrix(51, 0.13^2, 0.8) # 0.08^2
 state_correlation_error <- state_correlation_error * state_correlation
 
 #state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
@@ -289,6 +289,8 @@ mu_b_prior <- logit(prior_in$pred)
 names(mu_b_prior) <- prior_in$state
 names(mu_b_prior) == names(prior_diff_score) # correct order?
 
+national_mu_prior <- weighted.mean(inv.logit(mu_b_prior), state_weights)
+
 # The model uses national polls to complement state polls when estimating the national term mu_a.
 # One problem until early September, was that voters in polled states were different from average voters :
 # Several solid red states still hadn't been polled, the weighted average of state polls was slightly more pro-obama than national polls.
@@ -301,7 +303,7 @@ alpha_prior <- log(states2008$national_score[1]/score_among_polled)
 
 
 # checking the amounts of error in the correlation matrices
-y <- MASS::mvrnorm(10000, mu_b_prior, Sigma = state_correlation_error)
+y <- MASS::mvrnorm(10000, mu_b_prior, Sigma = state_correlation_mu_b_T)
 
 mean( inv.logit(apply(y, MARGIN = 2, mean) +  apply(y, MARGIN = 2, sd)) - inv.logit(apply(y, MARGIN = 2, mean)) )
 
@@ -309,7 +311,6 @@ mean( inv.logit(apply(y, MARGIN = 2, mean) +  apply(y, MARGIN = 2, sd)) - inv.lo
 adjusters <- c(
   "ABC",
   "Washington Post",
-  "IBD",
   "Ipsos",
   "Pew",
   "YouGov",
@@ -317,35 +318,10 @@ adjusters <- c(
 )
 
 
-# First stage predictions -------
-N <- nrow(df)
-S <- 51
-s <- df$index_s
-n_respondents <- df$n_respondents
-n_two_parties <- df$n_obama + df$n_mccain
-
-data_1st <- list(
-  # dimensions
-  N = N,
-  S = S,
-  # index
-  s = s,
-  # data
-  n_respondents = n_respondents,
-  n_two_parties = n_two_parties
-)
-# model
-m_1st <- rstan::stan_model("scripts/Stan/Refactored/poll_model_1st_stage_v3.stan")
-# run
-out <- rstan::sampling(m_1st, data = data_1st, iter = 1000,warmup=500, chains = 2)
-# extract
-two_share_mu <- apply(rstan::extract(out, pars = "two_parties_mu")[[1]], MARGIN = 2, mean)
-two_share_sd <- apply(rstan::extract(out, pars = "two_parties_sd")[[1]], MARGIN = 2, mean)
-
 # Passing the data to Stan and running the model ---------
 N_state <- nrow(df %>% filter(index_s != 52))
 N_national <- nrow(df %>% filter(index_s == 52))
-T <- T
+T <- as.integer(round(difftime(election_day, min(df$begin))))
 current_T <- max(df$poll_day)
 S <- 51
 P <- length(unique(df$pollster))
@@ -357,12 +333,8 @@ poll_state <- df %>% filter(index_s != 52) %>% pull(index_p)
 # data ---
 n_democrat_national <- df %>% filter(index_s == 52) %>% pull(n_obama)
 n_democrat_state <- df %>% filter(index_s != 52) %>% pull(n_obama)
-n_two_share_national <- df %>% filter(index_s == 52) %>% transmute(n_two_share = n_obama + n_mccain) %>% pull(n_two_share)
-n_two_share_state <- df %>% filter(index_s != 52) %>% transmute(n_two_share = n_obama + n_mccain) %>% pull(n_two_share)
-pred_two_share_national_mu    <- two_share_mu[52]
-pred_two_share_state_mu       <- two_share_mu[1:51]
-pred_two_share_national_sigma <- two_share_sd[52]
-pred_two_share_state_sigma    <- two_share_sd[1:51]
+n_two_share_national <- df %>% filter(index_s == 52) %>% transmute(n_two_share = n_mccain + n_obama) %>% pull(n_two_share)
+n_two_share_state <- df %>% filter(index_s != 52) %>% transmute(n_two_share = n_mccain + n_obama) %>% pull(n_two_share)
 unadjusted_national <- df %>% mutate(unadjusted = ifelse(!(pollster %in% adjusters), 1, 0)) %>% filter(index_s == 52) %>% pull(unadjusted)
 unadjusted_state <- df %>% mutate(unadjusted = ifelse(!(pollster %in% adjusters), 1, 0)) %>% filter(index_s != 52) %>% pull(unadjusted)
 
@@ -395,10 +367,6 @@ data <- list(
   n_democrat_state = n_democrat_state,
   n_two_share_national = n_two_share_national,
   n_two_share_state = n_two_share_state,
-  pred_two_share_national_mu = pred_two_share_national_mu,
-  pred_two_share_state_mu = pred_two_share_state_mu,
-  pred_two_share_national_sigma = pred_two_share_national_sigma,
-  pred_two_share_state_sigma = pred_two_share_state_sigma,
   unadjusted_national = unadjusted_national,
   unadjusted_state = unadjusted_state,
   current_T = as.integer(current_T),

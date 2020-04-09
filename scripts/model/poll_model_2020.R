@@ -150,7 +150,7 @@ state_data %>%
 state_correlation <- cor(state_data)  
 state_correlation[state_correlation < 0] <- 0 # nothing should be negatively correlated
 state_correlation <- make.positive.definite(state_correlation)
-state_correlation_error <- cov_matrix(51, 0.1^2, 0.8) 
+state_correlation_error <- cov_matrix(51, 0.13^2, 0.8) 
 state_correlation_error <- state_correlation_error * state_correlation
 state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.07, rho = 0.5) 
 state_correlation_mu_b_T <- state_correlation_mu_b_T * state_correlation
@@ -174,7 +174,9 @@ df <- df %>%
     # vote shares
     p_clinton, n_clinton, 
     p_trump, n_trump, 
+<<<<<<< HEAD
     poll_day, index_s, index_p, index_t)
+>>>>>>> 5fd18a9c6525a27fdc86290add27fd71574896af
 all_polled_states <- df$state %>% unique %>% sort
 # day indices
 ndays <- max(df$t) - min(df$t)
@@ -245,6 +247,7 @@ prior_in <- read_csv("data/state_priors_08_12_16.csv") %>%
 mu_b_prior <- logit(prior_in$pred)
 names(mu_b_prior) <- prior_in$state
 names(mu_b_prior) == names(prior_diff_score) # correct order?
+national_mu_prior <- weighted.mean(inv.logit(mu_b_prior), state_weights)
 ## --- Adjustment national v state polls
 score_among_polled <- sum(states2012[all_polled_states[-1],]$obama_count)/
   sum(states2012[all_polled_states[-1],]$obama_count + 
@@ -254,7 +257,6 @@ alpha_prior <- log(states2012$national_score[1]/score_among_polled)
 adjusters <- c(
   "ABC",
   "Washington Post",
-  "IBD",
   "Ipsos",
   "Pew",
   "YouGov",
@@ -264,7 +266,10 @@ adjusters <- c(
 # Passing the data to Stan and running the model ---------
 N_state <- nrow(df %>% filter(index_s != 52))
 N_national <- nrow(df %>% filter(index_s == 52))
+<<<<<<< HEAD
 T <- as.integer(round(difftime(election_day, first_day)))
+=======
+>>>>>>> 5fd18a9c6525a27fdc86290add27fd71574896af
 current_T <- max(df$poll_day)
 S <- 51
 P <- length(unique(df$pollster))
@@ -365,6 +370,7 @@ write_rds(out, sprintf('models/stan_model_%s.rds',RUN_DATE),compress = 'gz')
 #out <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
 
 ## --- priors
+<<<<<<< HEAD
 ## mu_b_T
 y <- MASS::mvrnorm(1000, mu_b_prior, Sigma = state_correlation_mu_b_T)
 mu_b_T_posterior_draw <- rstan::extract(out, pars = "mu_b")[[1]][,,254]
@@ -436,6 +442,7 @@ polling_error_plt <- polling_error_draws %>%
     theme_bw()
 
 ## Posterior
+>>>>>>> 5fd18a9c6525a27fdc86290add27fd71574896af
 # poll terms
 poll_terms <- rstan::extract(out, pars = "mu_c")[[1]]
 non_adjusters <- df %>% 
@@ -445,29 +452,29 @@ non_adjusters <- df %>%
   arrange(index_p)
 
 
-# mu_d
-e_bias <- rstan::extract(out, pars = "e_bias")[[1]]
-plt_adjusted <- lapply(1:100,
-       function(x){
-         tibble(e_bias_draw = e_bias[x,] 
-                - mean(poll_terms[x, non_adjusters[non_adjusters$unadjusted == 0, 2]$index_p])
-                + mean(poll_terms[x, non_adjusters[non_adjusters$unadjusted == 1, 2]$index_p]),
-                trial = x) %>%
-           mutate(date = min(df$end) + row_number()) 
-       }) %>%
-  do.call('bind_rows',.) %>%
-  ggplot(.,aes(x=date,y=e_bias_draw,group=trial)) +
-  geom_line(alpha=0.2)
-plt_unadjusted <- lapply(1:100,
-       function(x){
-         tibble(e_bias_draw = e_bias[x,],
-                trial = x) %>%
-           mutate(date = min(df$end) + row_number()) 
-       }) %>%
-  do.call('bind_rows',.) %>%
-  ggplot(.,aes(x=date,y=e_bias_draw,group=trial)) +
-  geom_line(alpha=0.2)
-grid.arrange(plt_adjusted, plt_unadjusted)
+# # mu_d
+# e_bias <- rstan::extract(out, pars = "e_bias")[[1]]
+# plt_adjusted <- lapply(1:100,
+#        function(x){
+#          tibble(e_bias_draw = e_bias[x,] 
+#                 - mean(poll_terms[x, non_adjusters[non_adjusters$unadjusted == 0, 2]$index_p])
+#                 + mean(poll_terms[x, non_adjusters[non_adjusters$unadjusted == 1, 2]$index_p]),
+#                 trial = x) %>%
+#            mutate(date = min(df$end) + row_number()) 
+#        }) %>%
+#   do.call('bind_rows',.) %>%
+#   ggplot(.,aes(x=date,y=e_bias_draw,group=trial)) +
+#   geom_line(alpha=0.2)
+# plt_unadjusted <- lapply(1:100,
+#        function(x){
+#          tibble(e_bias_draw = e_bias[x,],
+#                 trial = x) %>%
+#            mutate(date = min(df$end) + row_number()) 
+#        }) %>%
+#   do.call('bind_rows',.) %>%
+#   ggplot(.,aes(x=date,y=e_bias_draw,group=trial)) +
+#   geom_line(alpha=0.2)
+# grid.arrange(plt_adjusted, plt_unadjusted)
 
 # extract predictions
 predicted_score <- rstan::extract(out, pars = "predicted_score")[[1]]
@@ -636,7 +643,6 @@ p_clinton[p_clinton$state != '--',] %>%
   scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b') +
   scale_y_continuous(breaks=seq(-1,1,0.01)) +
   labs(subtitle = identifier)
-
 
 # final EV distribution
 final_evs <- draws %>%
