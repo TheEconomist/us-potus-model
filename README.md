@@ -11,4 +11,4 @@ Download the `model_summary.html` file and double-click to open in Chrome.
 
 ### Endmatter
 
-* Possible live-updating forecast on election night: [See Gelman and Silver 2020](http://www.stat.columbia.edu/~gelman/research/published/electionnight4.pdf)
+* Possible live-updating forecast on election night: [See Gelman and Silver 2010](http://www.stat.columbia.edu/~gelman/research/published/electionnight4.pdf)
