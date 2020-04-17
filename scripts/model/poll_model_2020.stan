@@ -4,11 +4,14 @@ data{
   int T;    // Number of days
   int S;    // Number of states (for which at least 1 poll is available) + 1
   int P;    // Number of pollsters
+  int M;    // Number of poll modes
   int<lower = 1, upper = S + 1> state[N_state]; // State index
   int<lower = 1, upper = T> day_state[N_state];   // Day index
   int<lower = 1, upper = T> day_national[N_national];   // Day index
   int<lower = 1, upper = P> poll_state[N_state];  // Pollster index
   int<lower = 1, upper = P> poll_national[N_national];  // Pollster index
+  int<lower = 1, upper = M> poll_mode_state[N_state];  // Poll mode index
+  int<lower = 1, upper = M> poll_mode_national[N_national];  // Poll mode index
   int n_democrat_national[N_national];
   int n_two_share_national[N_national];
   int n_democrat_state[N_state];
@@ -24,6 +27,7 @@ data{
   real<lower = 0> prior_sigma_b;
   vector[S] mu_b_prior; 
   real<lower = 0> prior_sigma_c;
+  real<lower = 0> prior_sigma_m;
   real<lower = 0> prior_sigma_e_bias;
   real<lower = 0> prior_sigma_mu_e_bias;
   real mu_alpha;    
@@ -47,6 +51,8 @@ parameters {
   matrix[S, T] raw_mu_b; 
   real<lower = 0> raw_sigma_c;
   vector[P] raw_mu_c;
+  real<lower = 0> raw_sigma_m;
+  vector[M] raw_mu_m;
   real raw_mu_e_bias;
   real<lower = 0> raw_sigma_e_bias;
   real<lower = 0, upper = 1> rho_bias;
@@ -66,6 +72,8 @@ transformed parameters {
   matrix[S, T] mu_b;
   real sigma_c;
   vector[P] mu_c;
+  real sigma_m;
+  vector[M] mu_m;
   real mu_e_bias;
   real sd_e_bias;
   vector[current_T] e_bias;
@@ -86,7 +94,9 @@ transformed parameters {
   for (t in 1:(T - current_T)) mu_b[:, T - t] = cholesky_ss_corr_mu_b_walk * raw_mu_b[:, T - t] + mu_b[:, T - t + 1];
   for (t in 1:(current_T - 1)) mu_b[:, current_T - t] = mu_b[:, current_T - t + 1] + raw_mu_b[:, current_T - t] * sigma_b;
   sigma_c = raw_sigma_c * prior_sigma_c;
+  sigma_m = raw_sigma_m * prior_sigma_m;
   mu_c = raw_mu_c * sigma_c;
+  mu_m = raw_mu_m * sigma_m;
   sd_e_bias = sqrt(1 - rho_bias^2);
   mu_e_bias = raw_mu_e_bias * prior_sigma_mu_e_bias;
   e_bias[1] = raw_e_bias[1];
@@ -100,6 +110,7 @@ transformed parameters {
       mu_a[day_state[i]] + 
       mu_b[state[i], day_state[i]] + 
       mu_c[poll_state[i]] + 
+      mu_m[poll_mode_state[i]] + 
       unadjusted_state[i] * e_bias[day_state[i]] +
       measure_noise_state[i] * sigma_measure_noise_state + polling_error[state[i]];
   }
@@ -107,6 +118,7 @@ transformed parameters {
     mu_a[day_national] + 
     alpha + 
     mu_c[poll_national] + 
+    mu_m[poll_mode_national] + 
     unadjusted_national .* e_bias[day_national] +
     measure_noise_national * sigma_measure_noise_national;
 }
@@ -120,6 +132,8 @@ model {
   to_vector(raw_mu_b) ~ std_normal();
   raw_sigma_c ~ std_normal();
   raw_mu_c ~ std_normal();
+  raw_sigma_m ~ std_normal();
+  raw_mu_m ~ std_normal();
   raw_mu_e_bias ~ std_normal();
   raw_sigma_e_bias ~ std_normal();
   rho_bias ~ normal(0.5, 0.25);

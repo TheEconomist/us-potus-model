@@ -3,10 +3,10 @@
 
 ## Setup
 rm(list = ls())
-options(mc.cores = 2)
-n_iter <- 1000
+options(mc.cores = 4)
+n_iter <- 2000
 n_warmup <- 500
-n_chains <- 2
+n_chains <- 4
 n_refresh <- 50
 
 ## Libraries
@@ -84,6 +84,10 @@ df <- df %>%
          other = ifelse(is.na(other), 0, other) + 
            ifelse(is.na(johnson), 0, johnson) + 
            ifelse(is.na(mcmullin), 0, mcmullin))
+
+# mode mutations
+df <- df %>% 
+  mutate(mode = ifelse(grepl("live phone",tolower(mode)),'Live phone component','No live phone component'))
 
 # vote shares etc
 df <- df %>%
@@ -164,7 +168,8 @@ df <- df %>%
                                      levels = c('--',colnames(state_correlation)))),
          index_s = ifelse(index_s == 1, 52, index_s - 1),
          index_t = 1 + as.numeric(t) - min(as.numeric(t)),
-         index_p = as.numeric(as.factor(as.character(pollster)))) %>%
+         index_p = as.numeric(as.factor(as.character(pollster))),
+         index_m = as.numeric(as.factor(as.character(mode)))) %>%
   # selections
   arrange(state, t, polltype, two_party_sum) %>% 
   distinct(state, t, pollster, .keep_all = TRUE) %>%
@@ -174,7 +179,7 @@ df <- df %>%
     # vote shares
     p_clinton, n_clinton, 
     p_trump, n_trump, 
-    poll_day, index_s, index_p, index_t)
+    poll_day, index_s, index_p, index_m, index_t)
 all_polled_states <- df$state %>% unique %>% sort
 # day indices
 ndays <- max(df$t) - min(df$t)
@@ -261,6 +266,8 @@ adjusters <- c(
   "NBC"
 )
 
+df %>% filter((pollster %in% adjusters)) %>% pull(pollster) %>% unique()
+
 # Passing the data to Stan and running the model ---------
 N_state <- nrow(df %>% filter(index_s != 52))
 N_national <- nrow(df %>% filter(index_s == 52))
@@ -268,11 +275,14 @@ T <- as.integer(round(difftime(election_day, first_day)))
 current_T <- max(df$poll_day)
 S <- 51
 P <- length(unique(df$pollster))
+M <- length(unique(df$method))
 state <- df %>% filter(index_s != 52) %>% pull(index_s)
 day_national <- df %>% filter(index_s == 52) %>% pull(poll_day) 
 day_state <- df %>% filter(index_s != 52) %>% pull(poll_day) 
 poll_national <- df %>% filter(index_s == 52) %>% pull(index_p) 
 poll_state <- df %>% filter(index_s != 52) %>% pull(index_p) 
+poll_mode_national <- df %>% filter(index_s == 52) %>% pull(index_m) 
+poll_mode_state <- df %>% filter(index_s != 52) %>% pull(index_m) 
 # data ---
 n_democrat_national <- df %>% filter(index_s == 52) %>% pull(n_clinton)
 n_democrat_state <- df %>% filter(index_s != 52) %>% pull(n_clinton)
@@ -288,6 +298,7 @@ prior_sigma_a <- 0.03 ### 0.05 / 2
 prior_sigma_b <- 0.04 ### 0.05 / 2
 mu_b_prior <- mu_b_prior
 prior_sigma_c <- 0.02 ### 0.1 / 2
+prior_sigma_m <- 0.02 ### 0.1 / 2
 prior_sigma_e_bias <- 0.03
 prior_sigma_mu_e_bias <- 0.03
 mu_alpha <- alpha_prior
@@ -301,11 +312,14 @@ data <- list(
   T = T,
   S = S,
   P = P,
+  M = M,
   state = state,
   day_state = as.integer(day_state),
   day_national = as.integer(day_national),
   poll_state = poll_state,
   poll_national = poll_national,
+  poll_mode_national = poll_mode_national, 
+  poll_mode_state = poll_mode_state,
   n_democrat_national = n_democrat_national,
   n_democrat_state = n_democrat_state,
   n_two_share_national = n_two_share_national,
@@ -322,6 +336,7 @@ data <- list(
   prior_sigma_b = prior_sigma_b,
   mu_b_prior = mu_b_prior,
   prior_sigma_c = prior_sigma_c,
+  prior_sigma_m = prior_sigma_m,
   prior_sigma_e_bias = prior_sigma_e_bias,
   prior_sigma_mu_e_bias = prior_sigma_mu_e_bias,
   mu_alpha = mu_alpha,
@@ -336,6 +351,7 @@ initf2 <- function(chain_id = 1) {
        raw_mu_a = rnorm(current_T),
        raw_mu_b = abs(matrix(rnorm(T * (S)), nrow = S, ncol = T)),
        raw_mu_c = abs(rnorm(P)),
+       raw_mu_m = abs(rnorm(M)),
        measure_noise_national = abs(rnorm(N_national)),
        measure_noise_state = abs(rnorm(N_state)),
        raw_polling_error = abs(rnorm(S)),
@@ -343,7 +359,8 @@ initf2 <- function(chain_id = 1) {
        sigma_measure_noise_state = abs(rnorm(1, 0, prior_sigma_measure_noise)),
        sigma_mu_a = abs(rnorm(1, 0, prior_sigma_a)),
        sigma_mu_b = abs(rnorm(1, 0, prior_sigma_b)),
-       sigma_mu_c = abs(rnorm(1, 0, prior_sigma_c))
+       sigma_mu_c = abs(rnorm(1, 0, prior_sigma_c)),
+       sigma_mu_m = abs(rnorm(1, 0, prior_sigma_m))
   )
 }
 
@@ -409,6 +426,30 @@ mu_c_plt <- mu_c_draws %>% arrange(mean) %>%
                   width = 0, position = position_dodge(width = 0.5)) +
     coord_flip() +
     theme_bw()
+## mu_m
+mu_m_posterior_draws <- rstan::extract(out, pars = "mu_m")[[1]] 
+mu_m_posterior_draws <- data.frame(draws = as.vector(mu_m_posterior_draws),
+                                   index_m = sort(rep(seq(1, M), dim(mu_m_posterior_draws)[1])), 
+                                   type = "posterior")
+mu_m_prior_draws <- data.frame(draws = rnorm(M * 1000, 0, prior_sigma_m),
+                               index_m = sort(rep(seq(1, M), 1000)), 
+                               type = "prior")
+mu_m_draws <- rbind(mu_m_posterior_draws, mu_m_prior_draws) 
+method <- df %>% select(method, index_m) %>% distinct()
+mu_m_draws <- merge(mu_m_draws, method, by = "index_m", all.x = TRUE)
+mu_m_draws <- mu_m_draws %>%
+  group_by(method, type) %>%
+  summarize(mean = mean(draws), 
+            low = mean(draws) - 1.96 * sd(draws),
+            high = mean(draws) + 1.96 * sd(draws))
+mu_m_plt <- mu_m_draws %>% arrange(mean) %>%
+  ggplot(.) +
+  geom_point(aes(y = mean, x = reorder(method, mean), color = type), 
+             position = position_dodge(width = 0.5)) +
+  geom_errorbar(aes(ymin = low, ymax = high, x = method, color = type), 
+                width = 0, position = position_dodge(width = 0.5)) +
+  coord_flip() +
+  theme_bw()
 ## state error terms
 polling_error_posterior <- rstan::extract(out, pars = "polling_error")[[1]]
 polling_error_posterior_draws <- data.frame(draws = as.vector(polling_error_posterior),
@@ -509,8 +550,7 @@ p_clinton <- p_clinton %>%
   )
 
 # look
-p_clinton %>% filter(t == max(t),state %in% ex_states) %>% mutate(se = (high - mean)/2)
-
+p_clinton %>% filter(t == max(t),state %in% c('--',ex_states)) %>% mutate(se = (high - mean)/2) %>% arrange(mean)
 
 # electoral college by simulation
 draws <- pblapply(1:dim(predicted_score)[3],
@@ -540,13 +580,13 @@ sim_evs <- draws %>%
 identifier <- paste0(Sys.Date()," || " , out@model_name)
 natl_polls.gg <- p_clinton %>%
   filter(state == '--') %>%
-  left_join(df %>% select(state,t,p_clinton)) %>% # plot over time
+  left_join(df %>% select(state,t,p_clinton,method)) %>% # plot over time
   # plot
   ggplot(.,aes(x=t)) +
   geom_ribbon(aes(ymin=low,ymax=high),col=NA,alpha=0.2) +
   geom_hline(yintercept = 0.5) +
   geom_hline(yintercept = national_mu_prior,linetype=2) +
-  geom_point(aes(y=p_clinton),alpha=0.5) +
+  geom_point(aes(y=p_clinton,shape=method),alpha=0.3) +
   geom_line(aes(y=mean)) +
   facet_wrap(~state) +
   theme_minimal()  +
@@ -565,15 +605,16 @@ natl_evs.gg <-  ggplot(sim_evs, aes(x=t)) +
 
 state_polls.gg <- p_clinton %>%
   filter(state %in% ex_states) %>%
-  left_join(df %>% select(state,t,p_clinton)) %>% # plot over time
+  left_join(df %>% select(state,t,p_clinton,method)) %>% # plot over time
   ggplot(.,aes(x=t,col=state)) +
   geom_ribbon(aes(ymin=low,ymax=high),col=NA,alpha=0.2) +
   geom_hline(yintercept = 0.5) +
-  geom_point(aes(y=p_clinton),alpha=0.5) +
+  geom_point(aes(y=p_clinton,shape=method),alpha=0.3) +
   geom_line(aes(y=mean)) +
   facet_wrap(~state) +
   theme_minimal()  +
-  theme(legend.position = 'none') +
+  theme(legend.position = 'top') +
+  guides(color='none') +
   scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b') +
   labs(subtitle='p_clinton state')
 
