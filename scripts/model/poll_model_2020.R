@@ -87,15 +87,14 @@ df <- df %>%
 
 # mode mutations
 df <- df %>% 
-  mutate(mode = ifelse(grepl("live phone",tolower(mode)),'Live phone component','No live phone component'))
+  mutate(mode = case_when(mode == 'Internet' ~ 'Online poll',
+                          grepl("live phone",tolower(mode)) ~ 'Live phone component',
+                          TRUE ~ 'Other'))
 
 # vote shares etc
 df <- df %>%
   mutate(two_party_sum = clinton + trump,
-         polltype = as.integer(as.character(recode(population, 
-                                                   "Likely Voters" = "0", 
-                                                   "Registered Voters" = "1",
-                                                   "Adults" = "2"))), 
+         polltype = population,
          n_respondents = round(n),
          # clinton
          n_clinton = round(n * clinton/100),
@@ -169,7 +168,8 @@ df <- df %>%
          index_s = ifelse(index_s == 1, 52, index_s - 1),
          index_t = 1 + as.numeric(t) - min(as.numeric(t)),
          index_p = as.numeric(as.factor(as.character(pollster))),
-         index_m = as.numeric(as.factor(as.character(mode)))) %>%
+         index_m = as.numeric(as.factor(as.character(mode))),
+         index_pop = as.numeric(as.factor(as.character(polltype)))) %>%
   # selections
   arrange(state, t, polltype, two_party_sum) %>% 
   distinct(state, t, pollster, .keep_all = TRUE) %>%
@@ -179,7 +179,7 @@ df <- df %>%
     # vote shares
     p_clinton, n_clinton, 
     p_trump, n_trump, 
-    poll_day, index_s, index_p, index_m, index_t)
+    poll_day, index_s, index_p, index_m, index_pop, index_t)
 all_polled_states <- df$state %>% unique %>% sort
 # day indices
 ndays <- max(df$t) - min(df$t)
@@ -276,6 +276,7 @@ current_T <- max(df$poll_day)
 S <- 51
 P <- length(unique(df$pollster))
 M <- length(unique(df$method))
+Pop <- length(unique(df$polltype))
 state <- df %>% filter(index_s != 52) %>% pull(index_s)
 day_national <- df %>% filter(index_s == 52) %>% pull(poll_day) 
 day_state <- df %>% filter(index_s != 52) %>% pull(poll_day) 
@@ -283,6 +284,8 @@ poll_national <- df %>% filter(index_s == 52) %>% pull(index_p)
 poll_state <- df %>% filter(index_s != 52) %>% pull(index_p) 
 poll_mode_national <- df %>% filter(index_s == 52) %>% pull(index_m) 
 poll_mode_state <- df %>% filter(index_s != 52) %>% pull(index_m) 
+poll_pop_national <- df %>% filter(index_s == 52) %>% pull(index_pop) 
+poll_pop_state <- df %>% filter(index_s != 52) %>% pull(index_p) 
 # data ---
 n_democrat_national <- df %>% filter(index_s == 52) %>% pull(n_clinton)
 n_democrat_state <- df %>% filter(index_s != 52) %>% pull(n_clinton)
@@ -299,6 +302,7 @@ prior_sigma_b <- 0.04 ### 0.05 / 2
 mu_b_prior <- mu_b_prior
 prior_sigma_c <- 0.02 ### 0.1 / 2
 prior_sigma_m <- 0.02 ### 0.1 / 2
+prior_sigma_pop <- 0.02 ### 0.1 / 2
 prior_sigma_e_bias <- 0.03
 prior_sigma_mu_e_bias <- 0.03
 mu_alpha <- alpha_prior
@@ -313,6 +317,7 @@ data <- list(
   S = S,
   P = P,
   M = M,
+  Pop = Pop,
   state = state,
   day_state = as.integer(day_state),
   day_national = as.integer(day_national),
@@ -320,6 +325,8 @@ data <- list(
   poll_national = poll_national,
   poll_mode_national = poll_mode_national, 
   poll_mode_state = poll_mode_state,
+  poll_pop_national = poll_mode_national, 
+  poll_pop_state = poll_mode_state,
   n_democrat_national = n_democrat_national,
   n_democrat_state = n_democrat_state,
   n_two_share_national = n_two_share_national,
@@ -337,6 +344,7 @@ data <- list(
   mu_b_prior = mu_b_prior,
   prior_sigma_c = prior_sigma_c,
   prior_sigma_m = prior_sigma_m,
+  prior_sigma_pop = prior_sigma_pop,
   prior_sigma_e_bias = prior_sigma_e_bias,
   prior_sigma_mu_e_bias = prior_sigma_mu_e_bias,
   mu_alpha = mu_alpha,
@@ -352,6 +360,7 @@ initf2 <- function(chain_id = 1) {
        raw_mu_b = abs(matrix(rnorm(T * (S)), nrow = S, ncol = T)),
        raw_mu_c = abs(rnorm(P)),
        raw_mu_m = abs(rnorm(M)),
+       raw_mu_pop = abs(rnorm(Pop)),
        measure_noise_national = abs(rnorm(N_national)),
        measure_noise_state = abs(rnorm(N_state)),
        raw_polling_error = abs(rnorm(S)),
@@ -360,7 +369,8 @@ initf2 <- function(chain_id = 1) {
        sigma_mu_a = abs(rnorm(1, 0, prior_sigma_a)),
        sigma_mu_b = abs(rnorm(1, 0, prior_sigma_b)),
        sigma_mu_c = abs(rnorm(1, 0, prior_sigma_c)),
-       sigma_mu_m = abs(rnorm(1, 0, prior_sigma_m))
+       sigma_mu_m = abs(rnorm(1, 0, prior_sigma_m)),
+       sigma_mu_pop = abs(rnorm(1, 0, prior_sigma_pop))
   )
 }
 
@@ -368,6 +378,7 @@ init_ll <- lapply(1:n_chains, function(id) initf2(chain_id = id))
 
 ### Run ----
 #model <- rstan::stan_model("scripts/model/poll_model_2020_no_partisan_correction.stan")
+#model <- rstan::stan_model("scripts/model/poll_model_2020_no_mode_adjustment.stan")
 model <- rstan::stan_model("scripts/model/poll_model_2020.stan")
 out <- rstan::sampling(model, data = data,
                        refresh = n_refresh,
@@ -379,8 +390,15 @@ out <- rstan::sampling(model, data = data,
 write_rds(out, sprintf('models/stan_model_%s.rds',RUN_DATE),compress = 'gz')
 
 ### Extract results ----
-#out <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
+# out <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
 
+# sigmas
+tibble(sigma_national = rstan::extract(out, pars = "sigma_a")[[1]],
+       sigma_state = rstan::extract(out, pars = "sigma_b")[[1]]) %>%
+  gather(parameter,value) %>%
+  ggplot(.,aes(x=value)) +
+  geom_histogram(binwidth=0.001) +
+  facet_grid(rows=vars(parameter))
 ## --- priors
 ## mu_b_T
 y <- MASS::mvrnorm(1000, mu_b_prior, Sigma = state_correlation_mu_b_T)
@@ -418,7 +436,10 @@ mu_c_draws <- mu_c_draws %>%
   summarize(mean = mean(draws), 
             low = mean(draws) - 1.96 * sd(draws),
             high = mean(draws) + 1.96 * sd(draws))
-mu_c_plt <- mu_c_draws %>% arrange(mean) %>%
+mu_c_plt <- mu_c_draws %>% 
+  arrange(mean) %>% 
+  filter(pollster %in% (df %>% group_by(pollster) %>% 
+                          summarise(n=n()) %>% filter(n>=5) %>% pull(pollster))) %>%
   ggplot(.) +
     geom_point(aes(y = mean, x = reorder(pollster, mean), color = type), 
                position = position_dodge(width = 0.5)) +
@@ -426,6 +447,7 @@ mu_c_plt <- mu_c_draws %>% arrange(mean) %>%
                   width = 0, position = position_dodge(width = 0.5)) +
     coord_flip() +
     theme_bw()
+#write_csv(mu_c_draws,'output/mu_c_draws_2016.csv')
 ## mu_m
 mu_m_posterior_draws <- rstan::extract(out, pars = "mu_m")[[1]] 
 mu_m_posterior_draws <- data.frame(draws = as.vector(mu_m_posterior_draws),
@@ -447,6 +469,30 @@ mu_m_plt <- mu_m_draws %>% arrange(mean) %>%
   geom_point(aes(y = mean, x = reorder(method, mean), color = type), 
              position = position_dodge(width = 0.5)) +
   geom_errorbar(aes(ymin = low, ymax = high, x = method, color = type), 
+                width = 0, position = position_dodge(width = 0.5)) +
+  coord_flip() +
+  theme_bw()
+## mu_pop
+mu_pop_posterior_draws <- rstan::extract(out, pars = "mu_pop")[[1]] 
+mu_pop_posterior_draws <- data.frame(draws = as.vector(mu_pop_posterior_draws),
+                                   index_pop = sort(rep(seq(1, M), dim(mu_pop_posterior_draws)[1])), 
+                                   type = "posterior")
+mu_pop_prior_draws <- data.frame(draws = rnorm(Pop * 1000, 0, prior_sigma_pop),
+                               index_pop = sort(rep(seq(1, Pop), 1000)), 
+                               type = "prior")
+mu_pop_draws <- rbind(mu_pop_posterior_draws, mu_pop_prior_draws) 
+method <- df %>% select(polltype, index_pop) %>% distinct()
+mu_pop_draws <- merge(mu_pop_draws, method, by = "index_pop", all.x = TRUE)
+mu_pop_draws <- mu_pop_draws %>%
+  group_by(polltype, type) %>%
+  summarize(mean = mean(draws), 
+            low = mean(draws) - 1.96 * sd(draws),
+            high = mean(draws) + 1.96 * sd(draws))
+mu_pop_plt <- mu_pop_draws %>% arrange(mean) %>%
+  ggplot(.) +
+  geom_point(aes(y = mean, x = reorder(polltype, mean), color = type), 
+             position = position_dodge(width = 0.5)) +
+  geom_errorbar(aes(ymin = low, ymax = high, x = polltype, color = type), 
                 width = 0, position = position_dodge(width = 0.5)) +
   coord_flip() +
   theme_bw()
@@ -694,7 +740,7 @@ ggplot(final_evs,aes(x=dem_ev,
         panel.grid.minor = element_blank()) +
   scale_fill_manual(name='Electoral College winner',values=c('Democratic'='#3A4EB1','Republican'='#E40A04')) +
   labs(x='Democratic electoral college votes',
-       subtitle=sprintf("p(dem win) = %s",mean(final_evs$dem_ev>=270)))
+       subtitle=sprintf("p(dem win) = %s",round(mean(final_evs$dem_ev>=270),2)) )
 
 # brier scores
 # https://www.buzzfeednews.com/article/jsvine/2016-election-forecast-grades
@@ -707,7 +753,6 @@ compare <- p_clinton %>%
          diff = (clinton_win_actual - clinton_win )^2) %>% 
   left_join(ev_state) %>% 
   mutate(ev_weight = ev/(sum(ev))) 
-
 
 tibble(outlet = c('538 polls-plus','538 polls-only','princeton','nyt upshot','kremp/slate','pollsavvy','predictwise markets','predictwise overall','desart and holbrook','daily kos','huffpost'),
        ev_wtd_brier = c(0.0928,0.0936,0.1169,0.1208,0.121,0.1219,0.1272,0.1276,0.1279,0.1439,0.1505),

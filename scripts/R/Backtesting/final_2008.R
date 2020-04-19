@@ -18,7 +18,6 @@ options(mc.cores = parallel::detectCores())
   library(survey, quietly = TRUE)
   library(gridExtra, quietly = TRUE)
   library(pbapply, quietly = TRUE)
-  library(here, quietly = TRUE)
   library(boot, quietly = TRUE)
   library(lqmm, quietly = TRUE)
   library(caret, quietly = TRUE)
@@ -415,7 +414,8 @@ init_ll <- lapply(1:n_chains, function(id) initf2(chain_id = id))
 
 # read model code
 #model <- rstan::stan_model("scripts/model/poll_model_2020_no_partisan_correction.stan")
-model <- rstan::stan_model("scripts/model/poll_model_2020.stan")
+model <- rstan::stan_model("scripts/model/poll_model_2020_no_mode_adjustment.stan")
+#model <- rstan::stan_model("scripts/model/poll_model_2020.stan")
 
 # run model
 out <- rstan::sampling(model, data = data,
@@ -443,6 +443,35 @@ tibble(sigma_national = rstan::extract(out, pars = "sigma_a")[[1]],
 # measurement noise
 measure_noise_national <- rstan::extract(out, pars = "measure_noise_national")[[1]] * mean(rstan::extract(out, pars = "sigma_measure_noise_national")[[1]])
 hist(measure_noise_national)
+# muc
+## mu_c
+mu_c_posterior_draws <- rstan::extract(out, pars = "mu_c")[[1]] 
+mu_c_posterior_draws <- data.frame(draws = as.vector(mu_c_posterior_draws),
+                                   index_p = sort(rep(seq(1, P), dim(mu_c_posterior_draws)[1])), 
+                                   type = "posterior")
+mu_c_prior_draws <- data.frame(draws = rnorm(P * 1000, 0, prior_sigma_c),
+                               index_p = sort(rep(seq(1, P), 1000)), 
+                               type = "prior")
+mu_c_draws <- rbind(mu_c_posterior_draws, mu_c_prior_draws) 
+pollster <- df %>% select(pollster, index_p) %>% distinct()
+mu_c_draws <- merge(mu_c_draws, pollster, by = "index_p", all.x = TRUE)
+mu_c_draws <- mu_c_draws %>%
+  group_by(pollster, type) %>%
+  summarize(mean = mean(draws), 
+            low = mean(draws) - 1.96 * sd(draws),
+            high = mean(draws) + 1.96 * sd(draws))
+mu_c_plt <- mu_c_draws %>% 
+  arrange(mean) %>% 
+  filter(pollster %in% (df %>% group_by(pollster) %>% 
+                          summarise(n=n()) %>% filter(n>=5) %>% pull(pollster))) %>%
+  ggplot(.) +
+  geom_point(aes(y = mean, x = reorder(pollster, mean), color = type), 
+             position = position_dodge(width = 0.5)) +
+  geom_errorbar(aes(ymin = low, ymax = high, x = pollster, color = type), 
+                width = 0, position = position_dodge(width = 0.5)) +
+  coord_flip() +
+  theme_bw()
+#write_csv(mu_c_draws,'output/mu_c_draws_2008.csv')
 # look at variation in mu_a
 mu_a <- rstan::extract(out, pars = "mu_a")[[1]]
 lapply(1:100,
