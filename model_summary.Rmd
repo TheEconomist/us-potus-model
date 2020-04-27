@@ -29,7 +29,7 @@ library(DT)
 # source('scripts/R/Backtesting/v8_2008.R');source('scripts/R/Backtesting/v8_2012.R');source('scripts/R/Refactored/poll_run_v8.R');rmarkdown::render('model_summary.Rmd');beepr::beep(2)
 
 # model version final:
-# source('scripts/R/Backtesting/final_2008.R');source('scripts/R/Backtesting/final_2012.R');source('scripts/model/poll_model_2020.R');rmarkdown::render('model_summary.Rmd',output_file = 'model_reports/final_new_prior_optimized_covar_0.8cor_inflated_error.html');beepr::beep(2);
+# source('scripts/R/Backtesting/final_2008.R');source('scripts/R/Backtesting/final_2012.R');source('scripts/model/poll_model_2020.R');rmarkdown::render('model_summary.Rmd',output_file = 'model_reports/final_new_prior_optimized_covar_0.5cor_newcovmat.html');beepr::beep(2);
 ```
 
 ## Methodology

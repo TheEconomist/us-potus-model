@@ -141,9 +141,9 @@ regions <- regions %>%
 # scale and spread
 state_data <- state_data %>%
   group_by(variable) %>%
-# scale all varaibles
-mutate(value = (value - min(value, na.rm=T)) / 
-         (max(value, na.rm=T) - min(value, na.rm=T))) %>%
+  # scale all varaibles
+  mutate(value = (value - min(value, na.rm=T)) / 
+           (max(value, na.rm=T) - min(value, na.rm=T))) %>%
   # now spread
   spread(state, value) %>% 
   na.omit() %>%
@@ -177,7 +177,7 @@ y <- MASS::mvrnorm(100000, rep(0.5,10), Sigma = cov_matrix(10, find_sigma2_value
 mean( inv.logit(apply(y, MARGIN = 2, mean) +  apply(y, MARGIN = 2, sd)) - inv.logit(apply(y, MARGIN = 2, mean)) ) 
 
 #state_correlation_error <- state_correlation # covariance for backward walk
-state_correlation_error <- cov_matrix(51, find_sigma2_value(empirical_sd = 0.034)$minimum^2, 0.8) # 3.4% on elec day
+state_correlation_error <- cov_matrix(51, find_sigma2_value(empirical_sd = 0.034)$minimum^2, 0.6) # 3.4% on elec day
 state_correlation_error <- state_correlation_error * state_correlation
 
 #state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
@@ -187,7 +187,7 @@ target_se = read_csv("data/state_priors_08_12_16.csv") %>%
   arrange(date) %>%
   filter(date == max(date)) %>%
   pull(se)
-target_se <- median(target_se,na.rm=T)
+target_se <- median(target_se,na.rm=T) 
 state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = find_sigma2_value(empirical_sd = target_se)$minimum^2, rho = 0.5) # 6% on elec day
 state_correlation_mu_b_T <- state_correlation_mu_b_T * state_correlation
 

@@ -153,9 +153,9 @@ state_data <- state_data %>%
   select(-variable)
 
 # test
-plot(state_data$MN, state_data$WI)
+#plot(state_data$MN, state_data$WI)
 state_data %>% 
-  select(AL,CA,FL,MN,NC,NM,RI,WI) %>%  #NV,FL,WI,MI,NH,OH,IA,NC,IN
+  select(NV,FL,WI,MI,NH,OH,IA,NC,IN) %>%  #AL,CA,FL,MN,NC,NM,RI,WI
   cor 
 
 # make matrices
@@ -179,7 +179,7 @@ y <- MASS::mvrnorm(100000, rep(0.5,10), Sigma = cov_matrix(10, find_sigma2_value
 mean( inv.logit(apply(y, MARGIN = 2, mean) +  apply(y, MARGIN = 2, sd)) - inv.logit(apply(y, MARGIN = 2, mean)) ) 
 
 #state_correlation_error <- state_correlation # covariance for backward walk
-state_correlation_error <- cov_matrix(51, find_sigma2_value(empirical_sd = 0.034)$minimum^2, 0.8) # 3.4% on elec day
+state_correlation_error <- cov_matrix(51, find_sigma2_value(empirical_sd = 0.034)$minimum^2, 0.6) # 3.4% on elec day
 state_correlation_error <- state_correlation_error * state_correlation
 
 #state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
