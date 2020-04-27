@@ -5,7 +5,7 @@
 rm(list = ls())
 options(mc.cores = 4)
 n_iter <- 2000
-n_warmup <- 500
+n_warmup <- 1000
 n_chains <- 4
 n_refresh <- 50
 
@@ -102,17 +102,18 @@ df <- df %>%
          n_trump = round(n * trump/100),
          p_trump = trump/two_party_sum)
 first_day <- min(df$start.date)
-# prepare stan date -----------------------------------------------------------
+# prepare stan data -----------------------------------------------------------
 
 ## --- create correlation matrix
 state_data <- read.csv("data/potus_results_76_16.csv")
 state_data <- state_data %>% 
   select(year, state, dem) %>%
   group_by(state) %>%
-  mutate(dem = dem - lag(dem)) %>%
+  mutate(dem = dem ) %>% #mutate(dem = dem - lag(dem)) %>%
   select(state,variable=year,value=dem)  %>%
   ungroup() %>%
   na.omit()
+
 census <- read.csv('data/acs_2013_variables.csv')
 census <- census %>%
   filter(!is.na(state)) %>% 
@@ -120,17 +121,25 @@ census <- census %>%
   group_by(state) %>%
   gather(variable,value,
          1:(ncol(.)-1))
+
 state_data <- state_data %>%
   mutate(variable = as.character(variable)) %>%
   bind_rows(census)
+
 # add region, as a dummy for each region
 regions <- read_csv('data/state_region_crosswalk.csv') %>%
   select(state = state_abb, variable=region) %>%
   mutate(value = 1) %>%
   spread(variable,value)
+
 regions[is.na(regions)] <- 0
+
 regions <- regions %>%
   gather(variable,value,2:ncol(.))
+
+#state_data <- state_data %>%
+#  bind_rows(regions)
+
 # scale and spread
 state_data <- state_data %>%
   group_by(variable) %>%
@@ -144,21 +153,50 @@ state_data <- state_data %>%
   select(-variable)
 
 # test
-#plot(state_data$MN, state_data$WI)
+plot(state_data$MN, state_data$WI)
 state_data %>% 
-  select(NV,FL,WI,MI,NH,OH,IA,NC,IN) %>%  #AL,CA,FL,MN,NC,NM,RI,WI
+  select(AL,CA,FL,MN,NC,NM,RI,WI) %>%  #NV,FL,WI,MI,NH,OH,IA,NC,IN
   cor 
 
 # make matrices
 state_correlation <- cor(state_data)  
 state_correlation[state_correlation < 0] <- 0 # nothing should be negatively correlated
 state_correlation <- make.positive.definite(state_correlation)
-state_correlation_error <- cov_matrix(51, 0.13^2, 0.8) 
+
+# function to find covariance coefficient for a gien standard deviation
+find_sigma2_value <- function(empirical_sd){
+  gen_residual <- function(par, target_sd){
+    y <- MASS::mvrnorm(100000, rep(0.5,10), Sigma = cov_matrix(10, par^2, 1) ) 
+    error <- mean( inv.logit(apply(y, MARGIN = 2, mean) +  apply(y, MARGIN = 2, sd)) - inv.logit(apply(y, MARGIN = 2, mean)) ) - target_sd
+    return(abs(error))
+  }
+  optimize(f = gen_residual, interval = c(0.00001,5),target_sd = empirical_sd,tol = 0.00001)
+}
+
+
+# checking the amounts of error in the correlation matrices
+y <- MASS::mvrnorm(100000, rep(0.5,10), Sigma = cov_matrix(10, find_sigma2_value(empirical_sd = 0.05)$minimum^2, 1) ) 
+mean( inv.logit(apply(y, MARGIN = 2, mean) +  apply(y, MARGIN = 2, sd)) - inv.logit(apply(y, MARGIN = 2, mean)) ) 
+
+#state_correlation_error <- state_correlation # covariance for backward walk
+state_correlation_error <- cov_matrix(51, find_sigma2_value(empirical_sd = 0.034)$minimum^2, 0.8) # 3.4% on elec day
 state_correlation_error <- state_correlation_error * state_correlation
-state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.07, rho = 0.5) 
+
+#state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
+target_se = read_csv("data/state_priors_08_12_16.csv") %>%
+  filter(date <= RUN_DATE) %>%
+  group_by(state) %>%
+  arrange(date) %>%
+  filter(date == max(date)) %>%
+  pull(se)
+target_se <- median(target_se,na.rm=T) 
+state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = find_sigma2_value(empirical_sd = target_se)$minimum^2, rho = 0.5) # 6% on elec day
 state_correlation_mu_b_T <- state_correlation_mu_b_T * state_correlation
+
+# state_correlation_mu_b_walk <- state_correlation
 state_correlation_mu_b_walk <- cov_matrix(51, (0.015)^2, 0.75) 
 state_correlation_mu_b_walk <- state_correlation_mu_b_walk * state_correlation
+
 ## --- numerical indices
 df <- df %>% 
   mutate(poll_day = t - min(t) + 1,
@@ -390,7 +428,7 @@ out <- rstan::sampling(model, data = data,
 write_rds(out, sprintf('models/stan_model_%s.rds',RUN_DATE),compress = 'gz')
 
 ### Extract results ----
-# out <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
+out <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
 
 # sigmas
 tibble(sigma_national = rstan::extract(out, pars = "sigma_a")[[1]],
@@ -556,22 +594,29 @@ non_adjusters <- df %>%
 #   geom_line(alpha=0.2)
 # grid.arrange(plt_adjusted, plt_unadjusted)
 
-# extract predictions
+# states
 predicted_score <- rstan::extract(out, pars = "predicted_score")[[1]]
 
+# state correlation?
+single_draw <- as.data.frame(predicted_score[,dim(predicted_score)[2],])
+names(single_draw) <- colnames(state_correlation)
+single_draw %>% 
+  select(AL,CA,FL,MN,NC,NM,RI,WI) %>%  #NV,FL,WI,MI,NH,OH,IA,NC,IN
+  cor 
+
 p_clinton <- pblapply(1:dim(predicted_score)[3],
-                       function(x){
-                         # pred is mu_a + mu_b for the past, just mu_b for the future
-                         p_clinton <- predicted_score[,,x]
-                         
-                         # put in tibble
-                         tibble(low = apply(p_clinton,2,function(x){(quantile(x,0.05))}),
-                                high = apply(p_clinton,2,function(x){(quantile(x,0.95))}),
-                                mean = apply(p_clinton,2,function(x){(mean(x))}),
-                                prob = apply(p_clinton,2,function(x){(mean(x>0.5))}),
-                                state = x) 
-                         
-                       }) %>% do.call('bind_rows',.)
+                    function(x){
+                      # pred is mu_a + mu_b for the past, just mu_b for the future
+                      temp <- predicted_score[,,x]
+                      
+                      # put in tibble
+                      tibble(low = apply(temp,2,function(x){(quantile(x,0.05))}),
+                             high = apply(temp,2,function(x){(quantile(x,0.95))}),
+                             mean = apply(temp,2,function(x){(mean(x))}),
+                             prob = apply(temp,2,function(x){(mean(x>0.5))}),
+                             state = x) 
+                      
+                    }) %>% do.call('bind_rows',.)
 
 p_clinton$state = colnames(state_correlation)[p_clinton$state]
 
@@ -580,23 +625,35 @@ p_clinton <- p_clinton %>%
   mutate(t = row_number() + min(df$begin)) %>%
   ungroup()
 
-ex_states <- c('IA','FL','OH','WI','MI','PA','AZ','NC','NH')
+# national
+p_clinton_natl <- pblapply(1:dim(predicted_score)[1],
+                         function(x){
+                           # each row is a day for a particular draw
+                           temp <- predicted_score[x,,] %>% as.data.frame()
+                           names(temp) <- colnames(state_correlation)
+                           
+                           # for each row, get weigted natl vote
+                           tibble(natl_vote = apply(temp,MARGIN = 1,function(y){weighted.mean(y,state_weights)})) %>%
+                             mutate(t = row_number() + min(df$begin)) %>%
+                             mutate(draw = x)
+                         }) %>% do.call('bind_rows',.)
 
-# together
-# national vote = vote * state weights
+p_clinton_natl <- p_clinton_natl %>%
+  group_by(t) %>%
+  summarise(low = quantile(natl_vote,0.05),
+            high = quantile(natl_vote,0.95),
+            mean = mean(natl_vote),
+            prob = mean(natl_vote > 0.5)) %>%
+  mutate(state = '--')
+
+# bind state and national vote
 p_clinton <- p_clinton %>%
-  bind_rows(
-    p_clinton %>% 
-    left_join(enframe(state_weights,'state','weight')) %>%
-    group_by(t) %>%
-    summarise(mean = weighted.mean(mean,weight),
-              high = weighted.mean(high,weight),
-              low = weighted.mean(low,weight)) %>%
-    mutate(state='--')
-  )
+  bind_rows(p_clinton_natl) %>%
+  arrange(desc(mean))
 
 # look
-p_clinton %>% filter(t == max(t),state %in% c('--',ex_states)) %>% mutate(se = (high - mean)/2) %>% arrange(mean)
+ex_states <- c('IA','FL','OH','WI','MI','PA','AZ','NC','NH','TX','GA','MN')
+p_clinton %>% filter(t == RUN_DATE,state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/2) %>% dplyr::select(-t)
 
 # electoral college by simulation
 draws <- pblapply(1:dim(predicted_score)[3],
@@ -731,7 +788,7 @@ final_evs <- draws %>%
   group_by(draw) %>%
   summarise(dem_ev = sum(ev* (p_clinton > 0.5)))
 
-ggplot(final_evs,aes(x=dem_ev,
+ev.gg <- ggplot(final_evs,aes(x=dem_ev,
                      fill=ifelse(dem_ev>=270,'Democratic','Republican'))) +
   geom_vline(xintercept = 270) +
   geom_histogram(binwidth=1) +
@@ -741,6 +798,8 @@ ggplot(final_evs,aes(x=dem_ev,
   scale_fill_manual(name='Electoral College winner',values=c('Democratic'='#3A4EB1','Republican'='#E40A04')) +
   labs(x='Democratic electoral college votes',
        subtitle=sprintf("p(dem win) = %s",round(mean(final_evs$dem_ev>=270),2)) )
+
+print(ev.gg)
 
 # brier scores
 # https://www.buzzfeednews.com/article/jsvine/2016-election-forecast-grades

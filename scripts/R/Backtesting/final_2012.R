@@ -3,7 +3,7 @@
 
 ## Setup
 #rm(list = ls())
-options(mc.cores = parallel::detectCores())
+options(mc.cores = 4)
 
 ## Libraries
 {
@@ -15,7 +15,6 @@ options(mc.cores = parallel::detectCores())
   library(curl, quietly = TRUE)
   library(shinystan, quietly = TRUE)
   library(rmarkdown, quietly = TRUE)
-  library(survey, quietly = TRUE)
   library(gridExtra, quietly = TRUE)
   library(pbapply, quietly = TRUE)
   library(boot, quietly = TRUE)
@@ -103,12 +102,12 @@ df <- df %>%
 
 # create correlation matrix ---------------------------------------------
 
-#here("data")
+## --- create correlation matrix
 state_data <- read.csv("data/potus_results_76_16.csv")
 state_data <- state_data %>% 
   select(year, state, dem) %>%
   group_by(state) %>%
-  mutate(dem = dem - lag(dem)) %>%
+  mutate(dem = dem ) %>% #mutate(dem = dem - lag(dem)) %>%
   select(state,variable=year,value=dem)  %>%
   ungroup() %>%
   na.omit()
@@ -162,12 +161,34 @@ state_correlation <- cor(state_data)
 state_correlation[state_correlation < 0] <- 0 # nothing should be negatively correlated
 state_correlation <- make.positive.definite(state_correlation)
 
+# function to find covariance coefficient for a gien standard deviation
+find_sigma2_value <- function(empirical_sd){
+  gen_residual <- function(par, target_sd){
+    y <- MASS::mvrnorm(100000, rep(0.5,10), Sigma = cov_matrix(10, par^2, 1) ) 
+    error <- mean( inv.logit(apply(y, MARGIN = 2, mean) +  apply(y, MARGIN = 2, sd)) - inv.logit(apply(y, MARGIN = 2, mean)) ) - target_sd
+    return(abs(error))
+  }
+  optimize(f = gen_residual, interval = c(0.00001,5),target_sd = empirical_sd,tol = 0.00001)
+}
+
+
+# checking the amounts of error in the correlation matrices
+y <- MASS::mvrnorm(100000, rep(0.5,10), Sigma = cov_matrix(10, find_sigma2_value(empirical_sd = 0.05)$minimum^2, 1) ) 
+mean( inv.logit(apply(y, MARGIN = 2, mean) +  apply(y, MARGIN = 2, sd)) - inv.logit(apply(y, MARGIN = 2, mean)) ) 
+
 #state_correlation_error <- state_correlation # covariance for backward walk
-state_correlation_error <- cov_matrix(51, 0.13^2, 0.8) # 0.08^2
+state_correlation_error <- cov_matrix(51, find_sigma2_value(empirical_sd = 0.034)$minimum^2, 0.8) # 3.4% on elec day
 state_correlation_error <- state_correlation_error * state_correlation
 
 #state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
-state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.07, rho = 0.5) #1/20
+target_se = read_csv("data/state_priors_08_12_16.csv") %>%
+  filter(date <= RUN_DATE) %>%
+  group_by(state) %>%
+  arrange(date) %>%
+  filter(date == max(date)) %>%
+  pull(se)
+target_se <- median(target_se,na.rm=T)
+state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = find_sigma2_value(empirical_sd = target_se)$minimum^2, rho = 0.5) # 6% on elec day
 state_correlation_mu_b_T <- state_correlation_mu_b_T * state_correlation
 
 # state_correlation_mu_b_walk <- state_correlation
@@ -303,12 +324,11 @@ score_among_polled <- sum(states2008[all_polled_states[-1],]$obama_count)/
 alpha_prior <- log(states2008$national_score[1]/score_among_polled)
 
 # checking the amounts of error in the correlation matrices
-y <- MASS::mvrnorm(10000, mu_b_prior, Sigma = state_correlation_error)
-
-mean( inv.logit(apply(y, MARGIN = 2, mean) +  apply(y, MARGIN = 2, sd)) - inv.logit(apply(y, MARGIN = 2, mean)) )
-
+y <- MASS::mvrnorm(10000, rep(0.5,length(mu_b_prior)), Sigma = state_correlation_error)
+mean( (apply(y, MARGIN = 2, mean) +  apply(y, MARGIN = 2, sd)) - (apply(y, MARGIN = 2, mean)) )
+mean(apply(y, MARGIN = 2, sd))
 ## adjusts
-adjusters <- c(
+  adjusters <- c(
   "ABC",
   "Washington Post",
   "Ipsos",
@@ -389,7 +409,7 @@ data <- list(
 
 ### Initialization ----
 
-n_chains <- 2
+n_chains <- 4
 
 initf2 <- function(chain_id = 1) {
   # cat("chain_id =", chain_id, "\n")
@@ -422,7 +442,7 @@ model <- rstan::stan_model("scripts/model/poll_model_2020_no_mode_adjustment.sta
 # run model
 out <- rstan::sampling(model, data = data,
                        refresh=50,
-                       chains = 2, iter = 1000, warmup=500, init = init_ll
+                       chains = 4, iter = 2000, warmup=1000, init = init_ll
 )
 
 # save model for today
@@ -486,19 +506,20 @@ lapply(1:100,
 # extract predictions
 predicted_score <- rstan::extract(out, pars = "predicted_score")[[1]]
 
+# states
 p_obama <- pblapply(1:dim(predicted_score)[3],
-                    function(x){
-                      # pred is mu_a + mu_b for the past, just mu_b for the future
-                      p_obama <- predicted_score[,,x]
-                      
-                      # put in tibble
-                      tibble(low = apply(p_obama,2,function(x){(quantile(x,0.05))}),
-                             high = apply(p_obama,2,function(x){(quantile(x,0.95))}),
-                             mean = apply(p_obama,2,function(x){(mean(x))}),
-                             prob = apply(p_obama,2,function(x){(mean(x>0.5))}),
-                             state = x) 
-                      
-                    }) %>% do.call('bind_rows',.)
+                      function(x){
+                        # pred is mu_a + mu_b for the past, just mu_b for the future
+                        temp <- predicted_score[,,x]
+                        
+                        # put in tibble
+                        tibble(low = apply(temp,2,function(x){(quantile(x,0.05))}),
+                               high = apply(temp,2,function(x){(quantile(x,0.95))}),
+                               mean = apply(temp,2,function(x){(mean(x))}),
+                               prob = apply(temp,2,function(x){(mean(x>0.5))}),
+                               state = x) 
+                        
+                      }) %>% do.call('bind_rows',.)
 
 p_obama$state = colnames(state_correlation)[p_obama$state]
 
@@ -507,23 +528,36 @@ p_obama <- p_obama %>%
   mutate(t = row_number() + min(df$begin)) %>%
   ungroup()
 
-ex_states <- c('NC','FL','OH','MI','WI','PA','VA','NV','NH')
+# national
+p_obama_natl <- pblapply(1:dim(predicted_score)[2],
+                           function(x){
+                             # each row is a day for a particular draw
+                             temp <- predicted_score[x,,] %>% as.data.frame()
+                             names(temp) <- colnames(state_correlation)
+                             
+                             # for each row, get weigted natl vote
+                             tibble(natl_vote = apply(temp,MARGIN = 1,function(y){weighted.mean(y,state_weights)})) %>%
+                               mutate(t = row_number() + min(df$begin)) %>%
+                               mutate(draw = x)
+                           }) %>% do.call('bind_rows',.)
 
-# together
-# national vote = vote * state weights
+p_obama_natl <- p_obama_natl %>%
+  group_by(t) %>%
+  summarise(low = quantile(natl_vote,0.05),
+            high = quantile(natl_vote,0.95),
+            mean = mean(natl_vote),
+            prob = mean(natl_vote > 0.5)) %>%
+  mutate(state = '--')
+
+# bind state and national vote
 p_obama <- p_obama %>%
-  bind_rows(
-    p_obama %>% 
-      left_join(enframe(state_weights,'state','weight')) %>%
-      group_by(t) %>%
-      summarise(mean = weighted.mean(mean,weight),
-                high = weighted.mean(high,weight),
-                low = weighted.mean(low,weight)) %>%
-      mutate(state='--')
-  )
+  bind_rows(p_obama_natl) %>%
+  arrange(desc(mean))
 
 # look
-p_obama %>% filter(t == max(t),state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/2)
+ex_states <- c('IA','FL','OH','WI','MI','PA','AZ','NC','NH','TX','GA','MN')
+p_obama %>% filter(t == RUN_DATE,state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/2) %>% dplyr::select(-t)
+
 
 urbnmapr::states %>%
   left_join(p_obama %>% filter(t == max(t)) %>%

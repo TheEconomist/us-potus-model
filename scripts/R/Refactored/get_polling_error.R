@@ -22,4 +22,34 @@ polls %>%
   summarise(median_error = median(abs(cand1_actual - cand1_pct)),
             rmse = sqrt(mean((cand1_actual - cand1_pct)^2)))
 
+# plot
+polls %>%
+    group_by(state=location,year) %>%
+    summarise(cand1_pct = mean(cand1_pct-cand2_pct,na.rm=T),
+              cand1_actual = unique(cand1_actual-cand2_actual)) %>%
+  filter(state != "DC") %>%
+  ggplot(.,aes(x=cand1_pct,y=cand1_actual)) +
+  geom_text(aes(label=state)) +
+  geom_abline() +
+  geom_smooth(method='lm') +
+  theme_minimal() +
+  facet_wrap(~year)
+
+
+
+# correlated in which states?
+polls %>%
+  expand(location,year) %>%
+  left_join(polls %>%
+            group_by(location,year) %>%
+            summarise(error = median(((cand1_actual-cand2_actual) - (cand1_pct-cand2_pct)))) %>%
+            ungroup()) %>%
+  group_by(year) %>%
+  mutate(error = ifelse(is.na(error),mean(error,na.rm=T),error)) %>%
+  ungroup() %>%
+  spread(location,error) %>%
+  select(-year) %>%
+  cor(.,use = 'complete.obs')  %>% View
+
+
 

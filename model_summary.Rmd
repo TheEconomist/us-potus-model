@@ -29,7 +29,7 @@ library(DT)
 # source('scripts/R/Backtesting/v8_2008.R');source('scripts/R/Backtesting/v8_2012.R');source('scripts/R/Refactored/poll_run_v8.R');rmarkdown::render('model_summary.Rmd');beepr::beep(2)
 
 # model version final:
-# source('scripts/R/Backtesting/final_2008.R');source('scripts/R/Backtesting/final_2012.R');source('scripts/model/poll_model_2020.R');rmarkdown::render('model_summary.Rmd');beepr::beep(2);
+# source('scripts/R/Backtesting/final_2008.R');source('scripts/R/Backtesting/final_2012.R');source('scripts/model/poll_model_2020.R');rmarkdown::render('model_summary.Rmd',output_file = 'model_reports/final_new_prior_optimized_covar_0.8cor_inflated_error.html');beepr::beep(2);
 ```
 
 ## Methodology
@@ -152,7 +152,7 @@ df <- df %>%
 #here("data")
 state_data <- read.csv("data/potus_results_76_16.csv")
 
-all_state_names <- levels(state_data$state)
+all_state_names <- unique(state_data$state)
 
 # Numerical indices passed to Stan for states, days, weeks, pollsters
 df <- df %>% 
@@ -240,46 +240,59 @@ lapply(1:100,
   ggplot(.,aes(x=date,y=mu_a_draw,group=trial)) +
   geom_line(alpha=0.2)
 # extract predictions
+# states
 predicted_score <- rstan::extract(out, pars = "predicted_score")[[1]]
 
 p_obama <- pblapply(1:dim(predicted_score)[3],
                     function(x){
                       # pred is mu_a + mu_b for the past, just mu_b for the future
-                      p_obama <- predicted_score[,,x]
+                      temp <- predicted_score[,,x]
                       
                       # put in tibble
-                      tibble(low = apply(p_obama,2,function(x){(quantile(x,0.05))}),
-                             high = apply(p_obama,2,function(x){(quantile(x,0.95))}),
-                             mean = apply(p_obama,2,function(x){(mean(x))}),
-                             prob = apply(p_obama,2,function(x){(mean(x>0.5))}),
+                      tibble(low = apply(temp,2,function(x){(quantile(x,0.05))}),
+                             high = apply(temp,2,function(x){(quantile(x,0.95))}),
+                             mean = apply(temp,2,function(x){(mean(x))}),
+                             prob = apply(temp,2,function(x){(mean(x>0.5))}),
                              state = x) 
                       
                     }) %>% do.call('bind_rows',.)
 
-p_obama$state = all_state_names[p_obama$state]
+p_obama$state = colnames(state_correlation)[p_obama$state]
 
 p_obama <- p_obama %>%
   group_by(state) %>%
   mutate(t = row_number() + min(df$begin)) %>%
   ungroup()
 
-ex_states <- c('MT','FL','OH','IN','CO','PA','MO','NC','NH')
+# national
+p_obama_natl <- pblapply(1:dim(predicted_score)[2],
+                         function(x){
+                           # each row is a day for a particular draw
+                           temp <- predicted_score[x,,] %>% as.data.frame()
+                           names(temp) <- colnames(state_correlation)
+                           
+                           # for each row, get weigted natl vote
+                           tibble(natl_vote = apply(temp,MARGIN = 1,function(y){weighted.mean(y,state_weights)})) %>%
+                             mutate(t = row_number() + min(df$begin)) %>%
+                             mutate(draw = x)
+                         }) %>% do.call('bind_rows',.)
 
-# together
-# national vote = vote * state weights
+p_obama_natl <- p_obama_natl %>%
+  group_by(t) %>%
+  summarise(low = quantile(natl_vote,0.05),
+            high = quantile(natl_vote,0.95),
+            mean = mean(natl_vote),
+            prob = mean(natl_vote > 0.5)) %>%
+  mutate(state = '--')
+
+# bind state and national vote
 p_obama <- p_obama %>%
-  bind_rows(
-    p_obama %>% 
-      left_join(enframe(state_weights,'state','weight')) %>%
-      group_by(t) %>%
-      summarise(mean = weighted.mean(mean,weight),
-                high = weighted.mean(high,weight),
-                low = weighted.mean(low,weight)) %>%
-      mutate(state='--')
-  )
+  bind_rows(p_obama_natl) %>%
+  arrange(desc(mean))
 
 # look
-p_obama %>% filter(t == max(t),state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/2)
+ex_states <- c('IA','FL','OH','WI','MI','PA','AZ','NC','NH','TX','GA','MN')
+p_obama %>% filter(t == RUN_DATE,state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/2) %>% dplyr::select(-t)
 
 map.2008.gg <- urbnmapr::states %>%
   left_join(p_obama %>% filter(t == max(t)) %>%
@@ -595,7 +608,7 @@ df <- df %>%
 #here("data")
 state_data <- read.csv("data/potus_results_76_16.csv")
 
-all_state_names <- levels(state_data$state)
+all_state_names <- unique(state_data$state)
 
 # Numerical indices passed to Stan for states, days, weeks, pollsters
 df <- df %>% 
@@ -685,44 +698,57 @@ lapply(1:100,
 # extract predictions
 predicted_score <- rstan::extract(out, pars = "predicted_score")[[1]]
 
+# states
 p_obama <- pblapply(1:dim(predicted_score)[3],
                     function(x){
                       # pred is mu_a + mu_b for the past, just mu_b for the future
-                      p_obama <- predicted_score[,,x]
+                      temp <- predicted_score[,,x]
                       
                       # put in tibble
-                      tibble(low = apply(p_obama,2,function(x){(quantile(x,0.05))}),
-                             high = apply(p_obama,2,function(x){(quantile(x,0.95))}),
-                             mean = apply(p_obama,2,function(x){(mean(x))}),
-                             prob = apply(p_obama,2,function(x){(mean(x>0.5))}),
+                      tibble(low = apply(temp,2,function(x){(quantile(x,0.05))}),
+                             high = apply(temp,2,function(x){(quantile(x,0.95))}),
+                             mean = apply(temp,2,function(x){(mean(x))}),
+                             prob = apply(temp,2,function(x){(mean(x>0.5))}),
                              state = x) 
                       
                     }) %>% do.call('bind_rows',.)
 
-p_obama$state = all_state_names[p_obama$state]
+p_obama$state = colnames(state_correlation)[p_obama$state]
 
 p_obama <- p_obama %>%
   group_by(state) %>%
   mutate(t = row_number() + min(df$begin)) %>%
   ungroup()
 
-ex_states <- c('NC','FL','OH','MI','WI','PA','VA','NV','NH')
+# national
+p_obama_natl <- pblapply(1:dim(predicted_score)[2],
+                         function(x){
+                           # each row is a day for a particular draw
+                           temp <- predicted_score[x,,] %>% as.data.frame()
+                           names(temp) <- colnames(state_correlation)
+                           
+                           # for each row, get weigted natl vote
+                           tibble(natl_vote = apply(temp,MARGIN = 1,function(y){weighted.mean(y,state_weights)})) %>%
+                             mutate(t = row_number() + min(df$begin)) %>%
+                             mutate(draw = x)
+                         }) %>% do.call('bind_rows',.)
 
-# together
-# national vote = vote * state weights
+p_obama_natl <- p_obama_natl %>%
+  group_by(t) %>%
+  summarise(low = quantile(natl_vote,0.05),
+            high = quantile(natl_vote,0.95),
+            mean = mean(natl_vote),
+            prob = mean(natl_vote > 0.5)) %>%
+  mutate(state = '--')
+
+# bind state and national vote
 p_obama <- p_obama %>%
-  bind_rows(
-    p_obama %>% 
-      left_join(enframe(state_weights,'state','weight')) %>%
-      group_by(t) %>%
-      summarise(mean = weighted.mean(mean,weight),
-                high = weighted.mean(high,weight),
-                low = weighted.mean(low,weight)) %>%
-      mutate(state='--')
-  )
+  bind_rows(p_obama_natl) %>%
+  arrange(desc(mean))
 
 # look
-p_obama %>% filter(t == max(t),state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/2)
+ex_states <- c('IA','FL','OH','WI','MI','PA','AZ','NC','NH','TX','GA','MN')
+p_obama %>% filter(t == RUN_DATE,state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/2) %>% dplyr::select(-t)
 
 map.2012.gg <- urbnmapr::states %>%
   left_join(p_obama %>% filter(t == max(t)) %>%
@@ -1046,7 +1072,7 @@ df <- df %>%
 #here("data")
 state_data <- read.csv("data/potus_results_76_16.csv")
 
-all_state_names <- levels(state_data$state)
+all_state_names <- unique(state_data$state)
 
 # Numerical indices passed to Stan for states, days, weeks, pollsters
 df <- df %>% 
@@ -1136,42 +1162,57 @@ lapply(1:100,
 # extract predictions
 predicted_score <- rstan::extract(out, pars = "predicted_score")[[1]]
 
+# states
 p_clinton <- pblapply(1:dim(predicted_score)[3],
                     function(x){
                       # pred is mu_a + mu_b for the past, just mu_b for the future
-                      p_clinton <- predicted_score[,,x]
+                      temp <- predicted_score[,,x]
                       
                       # put in tibble
-                      tibble(low = apply(p_clinton,2,function(x){(quantile(x,0.05))}),
-                             high = apply(p_clinton,2,function(x){(quantile(x,0.95))}),
-                             mean = apply(p_clinton,2,function(x){(mean(x))}),
-                             prob = apply(p_clinton,2,function(x){(mean(x>0.5))}),
+                      tibble(low = apply(temp,2,function(x){(quantile(x,0.05))}),
+                             high = apply(temp,2,function(x){(quantile(x,0.95))}),
+                             mean = apply(temp,2,function(x){(mean(x))}),
+                             prob = apply(temp,2,function(x){(mean(x>0.5))}),
                              state = x) 
                       
                     }) %>% do.call('bind_rows',.)
 
-p_clinton$state = all_state_names[p_clinton$state]
+p_clinton$state = colnames(state_correlation)[p_clinton$state]
 
 p_clinton <- p_clinton %>%
   group_by(state) %>%
   mutate(t = row_number() + min(df$begin)) %>%
   ungroup()
 
-ex_states <- c('NC','FL','OH','MI','WI','PA','VA','NV','NH')
+# national
+p_clinton_natl <- pblapply(1:dim(predicted_score)[2],
+                         function(x){
+                           # each row is a day for a particular draw
+                           temp <- predicted_score[x,,] %>% as.data.frame()
+                           names(temp) <- colnames(state_correlation)
+                           
+                           # for each row, get weigted natl vote
+                           tibble(natl_vote = apply(temp,MARGIN = 1,function(y){weighted.mean(y,state_weights)})) %>%
+                             mutate(t = row_number() + min(df$begin)) %>%
+                             mutate(draw = x)
+                         }) %>% do.call('bind_rows',.)
 
-# together
-# national vote = vote * state weights
+p_clinton_natl <- p_clinton_natl %>%
+  group_by(t) %>%
+  summarise(low = quantile(natl_vote,0.05),
+            high = quantile(natl_vote,0.95),
+            mean = mean(natl_vote),
+            prob = mean(natl_vote > 0.5)) %>%
+  mutate(state = '--')
+
+# bind state and national vote
 p_clinton <- p_clinton %>%
-  bind_rows(
-    p_clinton %>% 
-      left_join(enframe(state_weights,'state','weight')) %>%
-      group_by(t) %>%
-      summarise(mean = weighted.mean(mean,weight),
-                high = weighted.mean(high,weight),
-                low = weighted.mean(low,weight)) %>%
-      mutate(state='--')
-  )
+  bind_rows(p_clinton_natl) %>%
+  arrange(desc(mean))
 
+# look
+ex_states <- c('IA','FL','OH','WI','MI','PA','AZ','NC','NH','TX','GA','MN')
+p_clinton %>% filter(t == RUN_DATE,state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/2) %>% dplyr::select(-t)
 
 map.2016.gg <- urbnmapr::states %>%
   left_join(p_clinton %>% filter(t == max(t)) %>%
