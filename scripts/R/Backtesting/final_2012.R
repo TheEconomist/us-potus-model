@@ -177,7 +177,7 @@ y <- MASS::mvrnorm(100000, rep(0.5,10), Sigma = cov_matrix(10, find_sigma2_value
 mean( inv.logit(apply(y, MARGIN = 2, mean) +  apply(y, MARGIN = 2, sd)) - inv.logit(apply(y, MARGIN = 2, mean)) ) 
 
 #state_correlation_error <- state_correlation # covariance for backward walk
-state_correlation_error <- cov_matrix(51, find_sigma2_value(empirical_sd = 0.034)$minimum^2, 0.6) # 3.4% on elec day
+state_correlation_error <- cov_matrix(51, find_sigma2_value(empirical_sd = 0.025)$minimum^2, 0.6) # 3.4% on elec day
 state_correlation_error <- state_correlation_error * state_correlation
 
 #state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
@@ -360,7 +360,7 @@ unadjusted_state <- df %>% mutate(unadjusted = ifelse(!(pollster %in% adjusters)
 
 
 # priors ---
-prior_sigma_measure_noise <- 0.005 ### 0.1 / 2
+prior_sigma_measure_noise <- 0.01 ### 0.1 / 2
 prior_sigma_a <- 0.03 ### 0.05 / 2
 prior_sigma_b <- 0.04 ### 0.05 / 2
 mu_b_prior <- mu_b_prior
@@ -556,7 +556,7 @@ p_obama <- p_obama %>%
 
 # look
 ex_states <- c('IA','FL','OH','WI','MI','PA','AZ','NC','NH','TX','GA','MN')
-p_obama %>% filter(t == RUN_DATE,state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/2) %>% dplyr::select(-t)
+p_obama %>% filter(t == RUN_DATE,state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/1.68) %>% dplyr::select(-t)
 
 
 urbnmapr::states %>%

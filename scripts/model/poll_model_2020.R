@@ -179,7 +179,7 @@ y <- MASS::mvrnorm(100000, rep(0.5,10), Sigma = cov_matrix(10, find_sigma2_value
 mean( inv.logit(apply(y, MARGIN = 2, mean) +  apply(y, MARGIN = 2, sd)) - inv.logit(apply(y, MARGIN = 2, mean)) ) 
 
 #state_correlation_error <- state_correlation # covariance for backward walk
-state_correlation_error <- cov_matrix(51, find_sigma2_value(empirical_sd = 0.034)$minimum^2, 0.6) # 3.4% on elec day
+state_correlation_error <- cov_matrix(51, find_sigma2_value(empirical_sd = 0.025)$minimum^2, 0.6) # 3.4% on elec day
 state_correlation_error <- state_correlation_error * state_correlation
 
 #state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
@@ -334,7 +334,7 @@ unadjusted_state <- df %>% mutate(unadjusted = ifelse(!(pollster %in% adjusters)
 
                                    
 # priors ---
-prior_sigma_measure_noise <- 0.005 ### 0.1 / 2
+prior_sigma_measure_noise <- 0.01 ### 0.1 / 2
 prior_sigma_a <- 0.03 ### 0.05 / 2
 prior_sigma_b <- 0.04 ### 0.05 / 2
 mu_b_prior <- mu_b_prior
@@ -653,7 +653,7 @@ p_clinton <- p_clinton %>%
 
 # look
 ex_states <- c('IA','FL','OH','WI','MI','PA','AZ','NC','NH','TX','GA','MN')
-p_clinton %>% filter(t == RUN_DATE,state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/2) %>% dplyr::select(-t)
+p_clinton %>% filter(t == RUN_DATE,state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/1.68) %>% dplyr::select(-t)
 
 # electoral college by simulation
 draws <- pblapply(1:dim(predicted_score)[3],
@@ -728,6 +728,38 @@ grid.arrange(natl_polls.gg, natl_evs.gg, state_polls.gg,
 )
 
 
+# what's the tipping point state?
+tipping_point <- draws %>%
+  filter(t == election_day) %>%
+  left_join(states2012 %>% dplyr::select(state,ev),by='state') %>%
+  left_join(enframe(state_weights,'state','weight')) %>%
+  group_by(draw) %>%
+  mutate(dem_nat_pop_vote = weighted.mean(p_clinton,weight))
+
+tipping_point <- pblapply(1:max(tipping_point$draw),
+                          cl = parallel::detectCores() - 1,
+                          function(x){
+                            temp <- tipping_point[tipping_point$draw==x,]
+                            
+                            if(temp$dem_nat_pop_vote > 0.5){
+                              temp <- temp %>% arrange(desc(p_clinton))
+                            }else{
+                              temp <- temp %>% arrange(p_clinton)
+                            }
+                            
+                            return(temp)
+                          }) %>%
+  do.call('bind_rows',.)
+
+tipping_point %>%
+  mutate(cumulative_ev = cumsum(ev)) %>%
+  filter(cumulative_ev >= 270) %>%
+  filter(row_number() == 1) %>% 
+  group_by(state) %>%
+  summarise(prop = n()) %>%
+  mutate(prop = prop / sum(prop)) %>%
+  arrange(desc(prop)) 
+
 # probs v other forecasters
 ggplot(sim_evs, aes(x=t)) +
   geom_hline(yintercept = 0.5) +
@@ -798,6 +830,7 @@ ev.gg <- ggplot(final_evs,aes(x=dem_ev,
   scale_fill_manual(name='Electoral College winner',values=c('Democratic'='#3A4EB1','Republican'='#E40A04')) +
   labs(x='Democratic electoral college votes',
        subtitle=sprintf("p(dem win) = %s",round(mean(final_evs$dem_ev>=270),2)) )
+
 
 print(ev.gg)
 

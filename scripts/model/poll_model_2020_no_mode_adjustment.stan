@@ -84,7 +84,8 @@ transformed parameters {
   sigma_b = raw_sigma_b * prior_sigma_b;
   mu_b[:,T] = cholesky_ss_corr_mu_b_T * raw_mu_b_T + mu_b_prior;
   for (t in 1:(T - current_T)) mu_b[:, T - t] = cholesky_ss_corr_mu_b_walk * raw_mu_b[:, T - t] + mu_b[:, T - t + 1];
-  for (t in 1:(current_T - 1)) mu_b[:, current_T - t] = mu_b[:, current_T - t + 1] + raw_mu_b[:, current_T - t] * sigma_b;
+  for (t in 1:(current_T - 1)) mu_b[:, current_T - t] = cholesky_ss_corr_mu_b_walk * raw_mu_b[:, current_T - t] + mu_b[:, current_T - t + 1];
+  //for (t in 1:(current_T - 1)) mu_b[:, current_T - t] = mu_b[:, current_T - t + 1] + raw_mu_b[:, current_T - t] * sigma_b;
   sigma_c = raw_sigma_c * prior_sigma_c;
   mu_c = raw_mu_c * sigma_c;
   sd_e_bias = sqrt(1 - rho_bias^2);
