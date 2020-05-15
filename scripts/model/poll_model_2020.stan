@@ -140,7 +140,7 @@ model {
   raw_alpha ~ std_normal();
   raw_sigma_a ~ std_normal();
   raw_mu_a ~ std_normal();
-  raw_mu_b_T ~ std_normal();
+  raw_mu_b_T ~ student_t(17,0,1);
   raw_sigma_b ~ std_normal();
   to_vector(raw_mu_b) ~ std_normal();
   raw_sigma_c ~ std_normal();
@@ -157,7 +157,7 @@ model {
   raw_sigma_measure_noise_national ~ std_normal();
   measure_noise_national ~ std_normal();
   measure_noise_state ~ std_normal();
-  raw_polling_error ~ std_normal();
+  raw_polling_error ~ student_t(4,0,1);
   //*** likelihood
   n_democrat_state ~ binomial_logit(n_two_share_state, logit_pi_democrat_state);
   n_democrat_national ~ binomial_logit(n_two_share_national, logit_pi_democrat_national);
