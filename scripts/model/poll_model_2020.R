@@ -4,8 +4,8 @@
 ## Setup
 rm(list = ls())
 options(mc.cores = 4)
-n_iter <- 2000
-n_warmup <- 1000
+n_iter <- 1000
+n_warmup <- 500
 n_chains <- 4
 n_refresh <- 50
 
@@ -42,7 +42,7 @@ mean_low_high <- function(draws, states, id){
 }
 
 ## Master variables
-RUN_DATE <- min(ymd('2016-11-08'),Sys.Date())
+RUN_DATE <- ymd("2016-11-08")
 
 election_day <- ymd("2016-11-08")
 start_date <- as.Date("2016-03-01") # Keeping all polls after March 1, 2016
@@ -112,12 +112,13 @@ state_data <- state_data %>%
   mutate(dem = dem ) %>% #mutate(dem = dem - lag(dem)) %>%
   select(state,variable=year,value=dem)  %>%
   ungroup() %>%
-  na.omit()
+  na.omit() %>%
+  filter(variable == 2016)
 
 census <- read.csv('data/acs_2013_variables.csv')
 census <- census %>%
   filter(!is.na(state)) %>% 
-  select(-c(state_fips,pop_total)) %>%
+  select(-c(state_fips,pop_total,pop_density)) %>%
   group_by(state) %>%
   gather(variable,value,
          1:(ncol(.)-1))
@@ -125,6 +126,23 @@ census <- census %>%
 state_data <- state_data %>%
   mutate(variable = as.character(variable)) %>%
   bind_rows(census)
+
+# add urbanicity
+urbanicity <- read.csv('data/urbanicity_index.csv') %>%
+  dplyr::select(state,pop_density = average_log_pop_within_5_miles) %>%
+  gather(variable,value,
+         2:(ncol(.)))
+
+state_data <- state_data %>%
+  bind_rows(urbanicity)
+
+# add pct white evangelical
+white_evangel_pct <- read_csv('data/white_evangel_pct.csv') %>%
+  gather(variable,value,
+         2:(ncol(.)))
+
+state_data <- state_data %>%
+  bind_rows(white_evangel_pct)
 
 # add region, as a dummy for each region
 regions <- read_csv('data/state_region_crosswalk.csv') %>%
@@ -141,11 +159,12 @@ regions <- regions %>%
 #  bind_rows(regions)
 
 # scale and spread
-state_data <- state_data %>%
+state_cor <- state_data %>%
   group_by(variable) %>%
   # scale all varaibles
   mutate(value = (value - min(value, na.rm=T)) / 
            (max(value, na.rm=T) - min(value, na.rm=T))) %>%
+  #mutate(value = (value - mean(value)) / sd(value)) %>%
   # now spread
   spread(state, value) %>% 
   na.omit() %>%
@@ -153,13 +172,14 @@ state_data <- state_data %>%
   select(-variable)
 
 # test
-#plot(state_data$MN, state_data$WI)
-state_data %>% 
-  select(NV,FL,WI,MI,NH,OH,IA,NC,IN) %>%  #AL,CA,FL,MN,NC,NM,RI,WI
-  cor 
+ggplot(state_cor,aes(x=NV, y=FL)) + geom_point() + geom_smooth(method='lm')
+
+state_cor %>% 
+  dplyr::select(NV,FL,WI,MI,NH,OH,IA,NC,IN,TX,AZ) %>%  #AL,CA,FL,MN,NC,NM,RI,WI
+  cor
 
 # make matrices
-state_correlation <- cor(state_data)  
+state_correlation <- cor(state_cor)  
 state_correlation[state_correlation < 0] <- 0 # nothing should be negatively correlated
 state_correlation <- make.positive.definite(state_correlation)
 
@@ -173,13 +193,12 @@ find_sigma2_value <- function(empirical_sd){
   optimize(f = gen_residual, interval = c(0.00001,5),target_sd = empirical_sd,tol = 0.00001)
 }
 
-
 # checking the amounts of error in the correlation matrices
 y <- MASS::mvrnorm(100000, rep(0.5,10), Sigma = cov_matrix(10, find_sigma2_value(empirical_sd = 0.05)$minimum^2, 1) ) 
 mean( inv.logit(apply(y, MARGIN = 2, mean) +  apply(y, MARGIN = 2, sd)) - inv.logit(apply(y, MARGIN = 2, mean)) ) 
 
 #state_correlation_error <- state_correlation # covariance for backward walk
-state_correlation_error <- cov_matrix(51, find_sigma2_value(empirical_sd = 0.025)$minimum^2, 0.6) # 3.4% on elec day
+state_correlation_error <- cov_matrix(51, find_sigma2_value(empirical_sd = 0.025)$minimum^2, 0.9) # 3.4% on elec day
 state_correlation_error <- state_correlation_error * state_correlation
 
 #state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
@@ -189,12 +208,13 @@ target_se = read_csv("data/state_priors_08_12_16.csv") %>%
   arrange(date) %>%
   filter(date == max(date)) %>%
   pull(se)
-target_se <- median(target_se,na.rm=T) 
-state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = find_sigma2_value(empirical_sd = target_se)$minimum^2, rho = 0.5) # 6% on elec day
+target_se <- median(target_se,na.rm=T)
+#target_se <- max(median(target_se,na.rm=T) , sqrt(.05^2 + .01^2)) # don't let the model be more accurate than its historical performance
+state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = find_sigma2_value(empirical_sd = target_se)$minimum^2, rho = 0.9) # 6% on elec day
 state_correlation_mu_b_T <- state_correlation_mu_b_T * state_correlation
 
 # state_correlation_mu_b_walk <- state_correlation
-state_correlation_mu_b_walk <- cov_matrix(51, (0.015)^2, 0.75) 
+state_correlation_mu_b_walk <- cov_matrix(51, (0.015)^2, 0.9) 
 state_correlation_mu_b_walk <- state_correlation_mu_b_walk * state_correlation
 
 ## --- numerical indices
@@ -269,8 +289,6 @@ prior_model <- lm(
 # make predictions
 national_mu_prior <- predict(prior_model,newdata = tibble(q2gdp = 1.1,
                                                                 juneapp = 4))
-cat(sprintf('Prior Clinton two-party vote is %s\nWith a standard error of %s',
-            round(national_mu_prior/100,3),0.05))
 # on correct scale
 national_mu_prior <- national_mu_prior / 100
 # Mean of the mu_b_prior
@@ -289,6 +307,8 @@ mu_b_prior <- logit(prior_in$pred)
 names(mu_b_prior) <- prior_in$state
 names(mu_b_prior) == names(prior_diff_score) # correct order?
 national_mu_prior <- weighted.mean(inv.logit(mu_b_prior), state_weights)
+cat(sprintf('Prior Clinton two-party vote is %s\nWith a standard error of %s',
+            round(national_mu_prior,3),round(target_se,3)))
 ## --- Adjustment national v state polls
 score_among_polled <- sum(states2012[all_polled_states[-1],]$obama_count)/
   sum(states2012[all_polled_states[-1],]$obama_count + 

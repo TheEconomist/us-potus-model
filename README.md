@@ -7,7 +7,6 @@ Improving on Pierre Kremp's [implementation](http://www.slate.com/features/pkrem
 
 ## Model design and performance
 
-Download the `model_summary.html` file and double-click to open in Chrome.
 
 ### Endmatter
 

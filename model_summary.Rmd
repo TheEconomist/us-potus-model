@@ -1,6 +1,6 @@
 ---
 title: "_The Economist_'s Presidential Election Forecasting Model"
-subtitle: "Model designed in collaboration with Merlin Heidemanns and Andrew Gelman (Columbia University)"
+subtitle: "Model report"
 date: "Last update on `r format(Sys.time(), '%A %B %d, %Y at %I:%M %p %Z',tz='US/Eastern')`"
 output: 
   html_document:
@@ -20,55 +20,9 @@ library(urbnmapr)
 library(ggrepel)
 library(DT)
 
-# copy/paste this code to console to run all models again and render this document:
-
-# model version 12:
-# source('scripts/R/Backtesting/v7_2008.R');source('scripts/R/Backtesting/v7_2012.R');source('scripts/R/Refactored/poll_run_v7.R');rmarkdown::render('model_summary.Rmd');beepr::beep(2)
-
-# model version 13:
-# source('scripts/R/Backtesting/v8_2008.R');source('scripts/R/Backtesting/v8_2012.R');source('scripts/R/Refactored/poll_run_v8.R');rmarkdown::render('model_summary.Rmd');beepr::beep(2)
-
-# model version final:
-# source('scripts/R/Backtesting/final_2008.R');source('scripts/R/Backtesting/final_2012.R');source('scripts/model/poll_model_2020.R');rmarkdown::render('model_summary.Rmd',output_file = 'model_reports/final_final_actual_new_prior_optimized_covar_0.6cor_newcovmat_cor_average_student_t.html');beepr::beep(2);
+# final model version
+# source('scripts/model/poll_model_2020.R');source('scripts/model/final_2012.R');source('scripts/model/final_2008.R');rmarkdown::render('model_summary.Rmd',output_file = 'model_reports/v2_new_prior_optimized_covar_0.6cor_newcovmat_cor_average_student_t');beepr::beep(2);
 ```
-
-## Methodology
-
-Our forecasting model produces predictions for Democratic and Republican two-party vote share at the state and national level for every day in the election campaign. This section describes the method with which it arrives at those predictions. 
-
-Following the model description is a summary of how the method performed in the 2008, 2012 and 2016 presidential elections. 
-
-### Structure
-
-It is useful to think of the model as a combination of pre-election polls with other data about election outcomes, sometimes referred to as the "fundamentals" of the campaign. These data translate the president's popularity and the economic environment into long-range forecasts of the final election outcome, made as early as March and updated throughout the election year. In the Bayesian sense, the model is using state and national polls to update these prior expectations of the political environment. 
-
-We are interested not only in the precise vote-share predictions from the model, but also the level of certainty we do(n't) have in them. The model is thus made up of three different conceptual components:
-
-1. Prior predictions
-2. Polling averages
-3. Exploration of uncertainty
-
-The first two are easier to explain than the latter. But before we get there, let's address what data the model is ingesting.
-
-### Data
-
-TK
-Prior: Head-to-heads + economic index throughout the election year
-Polls: Well, polls :)
-
-### Prior
-
-TK
-
-### Poll averaging
-
-TK
-
-### Uncertianty (or, how wrong could we be?)
-
-TK
-
----
 
 ## Model performance {.tabset .tabset-fade}
 
@@ -148,6 +102,12 @@ df <- df %>%
 
 
 # state info
+state_correlation <- read.csv("data/potus_results_76_16.csv") %>% 
+    select(year, state, dem) %>%
+    group_by(state) %>%
+    mutate(dem = dem )  %>% 
+    spread(state,dem) %>% 
+    dplyr::select(-year)
 
 #here("data")
 state_data <- read.csv("data/potus_results_76_16.csv")
@@ -454,11 +414,32 @@ predictcompare.2008.gg <- p_obama %>%
               summarise(poll = weighted.mean(p_obama,n_respondents))) %>%
   left_join(enframe(mu_b_prior,'state','prior') %>%
               mutate(prior = inv.logit(prior))) %>%
+  left_join(model_v_actual.2008 %>% dplyr::select(state,actual)) %>%
   ggplot(.,aes(y=state)) +
   geom_point(aes(x=poll,col='poll')) +
   geom_point(aes(x=model_mean,col='model')) +
   geom_point(aes(x=prior,col='prior')) +
+  geom_point(aes(x=actual,col='result')) +
   theme_minimal()
+
+
+# model better than polls?
+ p_obama %>%
+  filter(t == max(t),state %in% ex_states) %>%
+  mutate(se = (high - mean)/1.68) %>%
+  select(state,model_mean=mean,model_se=se) %>%
+  left_join(df %>%
+              filter(t > (max(t)-14),
+                     state %in% ex_states) %>%
+              group_by(state) %>%
+              summarise(poll = weighted.mean(p_obama,n_respondents))) %>%
+  left_join(enframe(mu_b_prior,'state','prior') %>%
+              mutate(prior = inv.logit(prior))) %>%
+  left_join(model_v_actual.2008 %>% dplyr::select(state,actual)) %>% 
+   summarise(poll_error = mean(abs(poll-actual)),
+             model_error = mean(abs(model_mean-actual)))
+ 
+
 
 # expected EVs roughly match the stochastic simulations?
 final_states <- enframe(mu_b_prior,'state','prior') %>%
@@ -923,6 +904,7 @@ model_v_actual.2012.gg <- ggplot(model_v_actual.2012,aes(x=mean,y=actual,label=s
     stat_smooth(method='lm') +
     theme_minimal()
 
+
 # model vs final polls vs prior
 predictcompare.2012.gg <- p_obama %>%
   filter(t == max(t),state %in% ex_states) %>%
@@ -935,12 +917,31 @@ predictcompare.2012.gg <- p_obama %>%
               summarise(poll = weighted.mean(p_obama,n_respondents))) %>%
   left_join(enframe(mu_b_prior,'state','prior') %>%
               mutate(prior = inv.logit(prior))) %>%
+  left_join(model_v_actual.2012 %>% dplyr::select(state,actual)) %>%
   ggplot(.,aes(y=state)) +
   geom_point(aes(x=poll,col='poll')) +
   geom_point(aes(x=model_mean,col='model')) +
   geom_point(aes(x=prior,col='prior')) +
+  geom_point(aes(x=actual,col='result')) +
   theme_minimal()
 
+
+# model better than polls?
+ p_obama %>%
+  filter(t == max(t),state %in% ex_states) %>%
+  mutate(se = (high - mean)/1.68) %>%
+  select(state,model_mean=mean,model_se=se) %>%
+  left_join(df %>%
+              filter(t > (max(t)-14),
+                     state %in% ex_states) %>%
+              group_by(state) %>%
+              summarise(poll = weighted.mean(p_obama,n_respondents))) %>%
+  left_join(enframe(mu_b_prior,'state','prior') %>%
+              mutate(prior = inv.logit(prior))) %>%
+  left_join(model_v_actual.2012 %>% dplyr::select(state,actual)) %>% 
+   summarise(poll_error = mean(abs(poll-actual)),
+             model_error = mean(abs(model_mean-actual)))
+ 
 # expected EVs roughly match the stochastic simulations?
 final_states <- enframe(mu_b_prior,'state','prior') %>%
   left_join(df %>%
@@ -1107,6 +1108,12 @@ df <- df %>%
 
 
 # state info
+state_correlation <- read.csv("data/potus_results_76_16.csv") %>% 
+    select(year, state, dem) %>%
+    group_by(state) %>%
+    mutate(dem = dem )  %>% 
+    spread(state,dem) %>% 
+    dplyr::select(-year)
 
 #here("data")
 state_data <- read.csv("data/potus_results_76_16.csv")
@@ -1408,7 +1415,7 @@ model_v_actual.2016.gg <- ggplot(model_v_actual.2016,aes(x=mean,y=actual,label=s
 # model vs final polls vs prior
 predictcompare.2016.gg <- p_clinton %>%
   filter(t == max(t),state %in% ex_states) %>%
-  mutate(se = (high - mean)/2) %>%
+  mutate(se = (high - mean)/1.68) %>%
   select(state,model_mean=mean,model_se=se) %>%
   left_join(df %>%
               filter(t > (max(t)-14),
@@ -1417,11 +1424,30 @@ predictcompare.2016.gg <- p_clinton %>%
               summarise(poll = weighted.mean(p_clinton,n_respondents))) %>%
   left_join(enframe(mu_b_prior,'state','prior') %>%
               mutate(prior = inv.logit(prior))) %>%
+  left_join(model_v_actual.2016 %>% dplyr::select(state,actual)) %>%
   ggplot(.,aes(y=state)) +
   geom_point(aes(x=poll,col='poll')) +
   geom_point(aes(x=model_mean,col='model')) +
-  geom_point(aes(x=prior,col='prior')) + 
+  geom_point(aes(x=prior,col='prior')) +
+  geom_point(aes(x=actual,col='result')) +
   theme_minimal()
+
+
+# model better than polls?
+ p_clinton %>%
+  filter(t == max(t),state %in% ex_states) %>%
+  mutate(se = (high - mean)/1.68) %>%
+  select(state,model_mean=mean,model_se=se) %>%
+  left_join(df %>%
+              filter(t > (max(t)-14),
+                     state %in% ex_states) %>%
+              group_by(state) %>%
+              summarise(poll = weighted.mean(p_clinton,n_respondents))) %>%
+  left_join(enframe(mu_b_prior,'state','prior') %>%
+              mutate(prior = inv.logit(prior))) %>%
+  left_join(model_v_actual.2016 %>% dplyr::select(state,actual)) %>% 
+   summarise(poll_error = mean(abs(poll-actual)),
+             model_error = mean(abs(model_mean-actual)))
 
 # expected EVs roughly match the stochastic simulations?
 final_states <- enframe(mu_b_prior,'state','prior') %>%
@@ -1515,4 +1541,32 @@ p_clinton %>%
   datatable()
             
 ```
+
+
+
+## Cumulative charts
+
+### Calibration plot
+
+```{r echo=F,message=F,warning=F}
+calibration_data <- model_v_actual.2016 %>% mutate(year = 2016) %>%
+  bind_rows(model_v_actual.2012 %>% mutate(year = 2012)) %>%
+  bind_rows(model_v_actual.2008 %>% mutate(year = 2008))
+
+calibration.gg <- ggplot(calibration_data, aes(x=prob,y=ifelse(actual>0.5,1,0),
+                                               label = paste0(state,'-',year))) + 
+  geom_point() + 
+  geom_text_repel(data = calibration_data %>%
+                    filter(prob < 0.6 & actual>0.5 | 
+                                    prob > 0.4 & actual<0.5 )) + 
+  geom_smooth() +
+  geom_abline()  +
+  scale_x_continuous(breaks=seq(0,1,0.1)) +
+  scale_y_continuous(breaks=seq(0,1,0.1)) +
+  theme_minimal()
+
+print(calibration.gg)
+
+```
+
 
