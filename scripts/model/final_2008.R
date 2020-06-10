@@ -178,7 +178,7 @@ state_cor %>%
 
 # make matrices
 state_correlation <- cor(state_cor)  
-state_correlation[state_correlation < 0] <- 0 # nothing should be negatively correlated
+state_correlation[state_correlation < 0.3] <- 0.3 # baseline cor from national error
 state_correlation <- make.positive.definite(state_correlation)
 
 # function to find covariance coefficient for a gien standard deviation
@@ -191,28 +191,30 @@ find_sigma2_value <- function(empirical_sd){
   optimize(f = gen_residual, interval = c(0.00001,5),target_sd = empirical_sd,tol = 0.00001)
 }
 
-
 # checking the amounts of error in the correlation matrices
 y <- MASS::mvrnorm(100000, rep(0.5,10), Sigma = cov_matrix(10, find_sigma2_value(empirical_sd = 0.05)$minimum^2, 1) ) 
 mean( inv.logit(apply(y, MARGIN = 2, mean) +  apply(y, MARGIN = 2, sd)) - inv.logit(apply(y, MARGIN = 2, mean)) ) 
 
-#state_correlation_error <- state_correlation # covariance for backward walk
+# covariance for polling error
 state_correlation_error <- cov_matrix(51, find_sigma2_value(empirical_sd = 0.025)$minimum^2, 0.9) # 3.4% on elec day
 state_correlation_error <- state_correlation_error * state_correlation
 
-#state_correlation_mu_b_T <- state_correlation # covariance for prior e-day prediction
+# covariance for prior e-day prediction
 target_se = read_csv("data/state_priors_08_12_16.csv") %>%
   filter(date <= RUN_DATE) %>%
   group_by(state) %>%
   arrange(date) %>%
   filter(date == max(date)) %>%
   pull(se)
-target_se <- median(target_se,na.rm=T)
-state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = find_sigma2_value(empirical_sd = target_se)$minimum^2, rho = 0.9) # 6% on elec day
+
+state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = find_sigma2_value(empirical_sd = median(target_se))$minimum^2, rho = 0.9) # 6% on elec day
 state_correlation_mu_b_T <- state_correlation_mu_b_T * state_correlation
 
-# state_correlation_mu_b_walk <- state_correlation
-state_correlation_mu_b_walk <- cov_matrix(51, (0.015)^2, 0.9) 
+new_diag <- pbsapply(target_se, cl=parallel::detectCores()-1, function(x){find_sigma2_value(empirical_sd = x)$minimum})^2
+diag(state_correlation_mu_b_T) <- ifelse(new_diag > diag(state_correlation_mu_b_T), new_diag, diag(state_correlation_mu_b_T))
+
+# covariance matrix for random walks
+state_correlation_mu_b_walk <- cov_matrix(51, (0.01)^2, 0.9) 
 state_correlation_mu_b_walk <- state_correlation_mu_b_walk * state_correlation
 
 
