@@ -311,7 +311,8 @@ names(mu_b_prior) <- prior_in$state
 names(mu_b_prior) == names(prior_diff_score) # correct order?
 national_mu_prior <- weighted.mean(inv.logit(mu_b_prior), state_weights)
 cat(sprintf('Prior Clinton two-party vote is %s\nWith a standard error of %s',
-            round(national_mu_prior,3),round(target_se,3)))
+            round(national_mu_prior,3),round(median(target_se),3)))
+
 ## --- Adjustment national v state polls
 score_among_polled <- sum(states2012[all_polled_states[-1],]$obama_count)/
   sum(states2012[all_polled_states[-1],]$obama_count + 

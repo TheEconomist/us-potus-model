@@ -307,8 +307,6 @@ prior_model <- lm(
 # make predictions
 national_mu_prior <- predict(prior_model,newdata = tibble(q2gdp = 1.3,
                                                                 juneapp = 1))
-cat(sprintf('Prior Obama two-party vote is %s\nWith a standard error of %s',
-            round(national_mu_prior/100,3),0.05))
 
 # on correct scale
 national_mu_prior <- national_mu_prior / 100
@@ -334,6 +332,9 @@ names(mu_b_prior) <- prior_in$state
 names(mu_b_prior) == names(prior_diff_score) # correct order?
 
 national_mu_prior <- weighted.mean(inv.logit(mu_b_prior), state_weights)
+
+cat(sprintf('Prior Obama two-party vote is %s\nWith a standard error of %s',
+            round(national_mu_prior,3),round(median(target_se),3)))
 
 # The model uses national polls to complement state polls when estimating the national term mu_a.
 # One problem until early September, was that voters in polled states were different from average voters :

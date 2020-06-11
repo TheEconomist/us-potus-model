@@ -1,18 +1,36 @@
 ---
 title: "State and national presidential election forecasting model"
-subtitle: "From _The Economist_, Merlin Heidemanns and Andrew Gelman"
+subtitle: "By The Economist with Andrew Gelman and Merlin Heidemanns, Columbia University"
 date: "Last update on `r format(Sys.time(), '%A %B %d, %Y at %I:%M %p %Z',tz='US/Eastern')`"
 output: github_document
 ---
 
-Code for a dynamic multi-level Bayesian model to predict US presidential elections, implemented in Stan.
+Code for a dynamic multilevel Bayesian model to predict US presidential elections. Written in R and Stan.
 
 Improving on Pierre Kremp's [implementation](http://www.slate.com/features/pkremp_forecast/report.html) of Drew Linzer's dynamic linear model for election forecasting [(Linzer 2013)](https://votamatic.org/wp-content/uploads/2013/07/Linzer-JASA13.pdf), we (1) add corrections for partisan non-response, survey mode and survey population; (2) use informative state-level priors that update throughout the election year; and (3) specify empirical state-level correlations from political and demographic variables.
 
+You can see the model's predictions for 2020 [here](https://projects.economist.com/us-2020-forecast/president) and read how it works [here](https://projects.economist.com/us-2020-forecast/president/how-this-works).
 
 
+## File dictionary
+
+In terms of useful files, you should pay attention to the 3 scripts for the 2008, 2012 and 2016 US presidential elections are located in the `scripts/model` directory. There are three R scripts that import data, run models and parse results:
+
+* `final_model_2008.R`
+* `final_model_2012.R`
+* `final_model_2016.R`
+
+And there are 3 different Stan scripts that will run different versions of our polling aggregate and election forecasting model:
+
+* `poll_model_2020.stan` - the final model we use for the 2020 presidential election
+* `poll_model_2020_no_partisan_correction.stan` - a model that removes the correction for partisan non-response bias in the polls
+* `poll_model_2020_no_mode_adjustment.stan` - a model that further removes the adjustments for the mode in which a survey is conducted (live phone, online, other) and its population (adult, likely voter, registered voter)
+
+The model diagnostics displayed below are all results of the `poll_model_2020.stan` script.
 
 ## Model performance 
+
+Here is a graphical summary of the model's performance in 2008, 2012 and 2016.
 
 
 ```{r setup, include=FALSE}
@@ -27,15 +45,10 @@ library(ggrepel)
 library(DT)
 
 # final model version
-# source('scripts/model/poll_model_2020.R');source('scripts/model/final_2012.R');source('scripts/model/final_2008.R');rmarkdown::render('model_summary.Rmd',output_file = 'model_reports/v3_add_baseline_cov');beepr::beep(2);
+# source('scripts/model/final_2016.R');source('scripts/model/final_2012.R');source('scripts/model/final_2008.R');rmarkdown::render('README.Rmd',output_file = 'README.md');beepr::beep(2);
 ```
 
 
-
-Overall:
-
-
-Select an election for more:
 
 ### 2008 
 
@@ -486,13 +499,13 @@ final_evs.2008.gg <-  ggplot(final_evs,aes(x=dem_ev,
 map.2008.gg
 ```
 
-#### Final electoral college histogram
+#### Final electoral-college histogram
 
 ```{r echo=F,message=F,warning=F}
 final_evs.2008.gg
 ```
 
-#### National and state polls and the electoral college over time
+#### National and state polling averages and the electoral college "now-cast" over time
 
 ```{r echo=F,message=F,warning=F,fig.width = 9, fig.asp = .62}
 grid.arrange(natl_polls.2008.gg, natl_evs.2008.gg, state_polls.2008.gg, 
@@ -502,7 +515,7 @@ grid.arrange(natl_polls.2008.gg, natl_evs.2008.gg, state_polls.2008.gg,
 )
 ```
 
-#### State vs national deltas over time
+#### States' partisan leans over time
 
 ```{r echo=F,message=F,warning=F}
 state_lean.2008.gg
@@ -988,13 +1001,13 @@ final_evs.2012.gg <-  ggplot(final_evs,aes(x=dem_ev,
 map.2012.gg
 ```
 
-#### Final electoral college histogram
+#### Final electoral-college histogram
 
 ```{r echo=F,message=F,warning=F}
 final_evs.2012.gg
 ```
 
-#### National and state polls and the electoral college over time
+#### National and state polling averages and the electoral college "now-cast" over time
 
 ```{r echo=F,message=F,warning=F,fig.width = 9, fig.asp = .62}
 grid.arrange(natl_polls.2012.gg, natl_evs.2012.gg, state_polls.2012.gg, 
@@ -1004,7 +1017,7 @@ grid.arrange(natl_polls.2012.gg, natl_evs.2012.gg, state_polls.2012.gg,
 )
 ```
 
-#### State vs national deltas over time
+#### States' partisan leans over time
 
 ```{r echo=F,message=F,warning=F}
 state_lean.2012.gg
@@ -1495,13 +1508,13 @@ final_evs.2016.gg <-  ggplot(final_evs,aes(x=dem_ev,
 map.2016.gg
 ```
 
-#### Final electoral college histogram
+#### Final electoral-college histogram
 
 ```{r echo=F,message=F,warning=F}
 final_evs.2016.gg
 ```
 
-#### National and state polls and the electoral college over time
+#### National and state polling averages and the electoral college "now-cast" over time
 
 ```{r echo=F,message=F,warning=F,fig.width = 9, fig.asp = .62}
 grid.arrange(natl_polls.2016.gg, natl_evs.2016.gg, state_polls.2016.gg, 
@@ -1511,7 +1524,7 @@ grid.arrange(natl_polls.2016.gg, natl_evs.2016.gg, state_polls.2016.gg,
 )
 ```
 
-#### State vs national deltas over time
+#### States' partisan leans over time
 
 ```{r echo=F,message=F,warning=F}
 state_lean.2016.gg

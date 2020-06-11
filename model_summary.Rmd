@@ -19,7 +19,7 @@ library(ggrepel)
 library(DT)
 
 # final model version
-# source('scripts/model/poll_model_2020.R');source('scripts/model/final_2012.R');source('scripts/model/final_2008.R');rmarkdown::render('model_summary.Rmd',output_file = 'model_reports/v3_add_baseline_cov');beepr::beep(2);
+# source('scripts/model/final_2016.R');source('scripts/model/final_2012.R');source('scripts/model/final_2008.R');rmarkdown::render('model_summary.Rmd',output_file = 'model_reports/v3_add_baseline_cov');beepr::beep(2);
 ```
 
 ## Model performance {.tabset .tabset-fade}
