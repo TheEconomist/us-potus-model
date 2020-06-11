@@ -1,6 +1,6 @@
 State and national presidential election forecasting model
 ================
-Last update on Wednesday June 10, 2020 at 10:58 PM EDT
+Last update on Thursday June 11, 2020 at 06:32 AM EDT
 
 Code for a dynamic multilevel Bayesian model to predict US presidential
 elections. Written in R and Stan.
@@ -340,3 +340,12 @@ Here is a graphical summary of the model’s performance in 2008, 2012 and
 ### Calibration plot
 
 ![](README_files/figure-gfm/unnamed-chunk-25-1.png)<!-- -->
+
+# License
+
+MIT License
+
+Copyright (c) 2018 The Economist Newspaper
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy
