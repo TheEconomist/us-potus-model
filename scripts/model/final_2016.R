@@ -347,7 +347,7 @@ poll_state <- df %>% filter(index_s != 52) %>% pull(index_p)
 poll_mode_national <- df %>% filter(index_s == 52) %>% pull(index_m) 
 poll_mode_state <- df %>% filter(index_s != 52) %>% pull(index_m) 
 poll_pop_national <- df %>% filter(index_s == 52) %>% pull(index_pop) 
-poll_pop_state <- df %>% filter(index_s != 52) %>% pull(index_p) 
+poll_pop_state <- df %>% filter(index_s != 52) %>% pull(index_pop) 
 # data ---
 n_democrat_national <- df %>% filter(index_s == 52) %>% pull(n_clinton)
 n_democrat_state <- df %>% filter(index_s != 52) %>% pull(n_clinton)
@@ -387,8 +387,8 @@ data <- list(
   poll_national = poll_national,
   poll_mode_national = poll_mode_national, 
   poll_mode_state = poll_mode_state,
-  poll_pop_national = poll_mode_national, 
-  poll_pop_state = poll_mode_state,
+  poll_pop_national = poll_pop_national, 
+  poll_pop_state = poll_pop_state,
   n_democrat_national = n_democrat_national,
   n_democrat_state = n_democrat_state,
   n_two_share_national = n_two_share_national,

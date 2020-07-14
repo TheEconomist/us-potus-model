@@ -2,7 +2,7 @@
 title: "_The Economist_'s Presidential Election Forecasting Model"
 subtitle: "Model report"
 date: "Last update on `r format(Sys.time(), '%A %B %d, %Y at %I:%M %p %Z',tz='US/Eastern')`"
-output: github_document
+output: html_document
 ---
 
 ---
