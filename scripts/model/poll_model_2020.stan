@@ -70,6 +70,7 @@ transformed parameters {
   vector[S] polling_error = cholesky_ss_cov_error * raw_polling_error;
   vector[T] national_mu_b_average;
   real national_polling_error_average = transpose(polling_error) * state_weights;
+  real sigma_rho;
   //*** containers
   vector[N_state] logit_pi_democrat_state;
   vector[N_national] logit_pi_democrat_national;
@@ -83,7 +84,8 @@ transformed parameters {
   mu_m = raw_mu_m * sigma_m;
   mu_pop = raw_mu_pop * sigma_pop;
   e_bias[1] = raw_e_bias[1] * sigma_e_bias;
-  for (t in 2:current_T) e_bias[t] = mu_e_bias + rho_e_bias * (e_bias[t - 1] - mu_e_bias) + raw_e_bias[t] * sigma_e_bias * sqrt(1-rho_e_bias^2);
+  sigma_rho = sqrt(1-square(rho_e_bias)) * sigma_e_bias;
+  for (t in 2:current_T) e_bias[t] = mu_e_bias + rho_e_bias * (e_bias[t - 1] - mu_e_bias) + raw_e_bias[t] * sigma_rho;
   //*** fill pi_democrat
   for (i in 1:N_state){
     logit_pi_democrat_state[i] = 
