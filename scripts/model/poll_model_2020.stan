@@ -22,99 +22,68 @@ data{
   vector<lower = 0, upper = 1.0>[N_national] unadjusted_national;
   vector<lower = 0, upper = 1.0>[N_state] unadjusted_state;
   int<lower = 1, upper = T> current_T;
-  matrix[S, S] ss_corr_mu_b_walk;
-  matrix[S, S] ss_corr_mu_b_T;
-  matrix[S, S] ss_corr_error;
+  cov_matrix[S] ss_cov_mu_b_walk;
+  cov_matrix[S] ss_cov_mu_b_T;
+  cov_matrix[S] ss_cov_error;
   //*** prior input
-  real<lower = 0> prior_sigma_a;
-  real<lower = 0> prior_sigma_b;
   vector[S] mu_b_prior; 
-  real<lower = 0> prior_sigma_c;
-  real<lower = 0> prior_sigma_m;
-  real<lower = 0> prior_sigma_pop;
-  real<lower = 0> prior_sigma_e_bias;
-  real<lower = 0> prior_sigma_mu_e_bias;
-  real mu_alpha;    
-  real sigma_alpha; 
-  real<lower = 0> prior_sigma_measure_noise;
+  vector[S] state_weights;
+  real sigma_a;
+  real sigma_c;
+  real sigma_m;
+  real sigma_pop;
+  real sigma_measure_noise_national;
+  real sigma_measure_noise_state;
+  real sigma_e_bias;
 }
 transformed data {
-  matrix[S, S] cholesky_ss_corr_mu_b_T;
-  matrix[S, S] cholesky_ss_corr_mu_b_walk;
-  matrix[S, S] cholesky_ss_corr_error;
-  cholesky_ss_corr_mu_b_T = cholesky_decompose(ss_corr_mu_b_T);
-  cholesky_ss_corr_mu_b_walk = cholesky_decompose(ss_corr_mu_b_walk);
-  cholesky_ss_corr_error = cholesky_decompose(ss_corr_error);
+  cholesky_factor_cov[S] cholesky_ss_cov_mu_b_T;
+  cholesky_factor_cov[S] cholesky_ss_cov_mu_b_walk;
+  cholesky_factor_cov[S] cholesky_ss_cov_error;
+  cholesky_ss_cov_mu_b_T = cholesky_decompose(ss_cov_mu_b_T);
+  cholesky_ss_cov_mu_b_walk = cholesky_decompose(ss_cov_mu_b_walk);
+  cholesky_ss_cov_error = cholesky_decompose(ss_cov_error);
 }
 parameters {
-  real raw_alpha;             
-  real<lower = 0> raw_sigma_a;
-  real raw_mu_a[current_T];
-  real<lower = 0> raw_sigma_b;
+  real raw_mu_a[T];
   vector[S] raw_mu_b_T;
   matrix[S, T] raw_mu_b; 
-  real<lower = 0> raw_sigma_c;
   vector[P] raw_mu_c;
-  real<lower = 0> raw_sigma_m;
   vector[M] raw_mu_m;
-  real<lower = 0> raw_sigma_pop;
   vector[Pop] raw_mu_pop;
-  real raw_mu_e_bias;
-  real<lower = 0> raw_sigma_e_bias;
-  real<lower = 0, upper = 1> rho_bias;
+  real<offset=0, multiplier=0.06> mu_e_bias;
+  real<offset=0, multiplier=0.06> rho_e_bias;
   vector[current_T] raw_e_bias;
-  real <lower = 0> raw_sigma_measure_noise_state;
-  real <lower = 0> raw_sigma_measure_noise_national;
-  vector[N_national] measure_noise_national;
-  vector[N_state] measure_noise_state;
+  vector[N_national] raw_measure_noise_national;
+  vector[N_state] raw_measure_noise_state;
   vector[S] raw_polling_error; 
+  real mu_b_T_model_estimation_error;
 }
 transformed parameters {
   //*** parameters
-  real sigma_a;
-  real alpha;
-  vector[current_T] mu_a;
-  real sigma_b;
+  vector[T] mu_a;
   matrix[S, T] mu_b;
-  real sigma_c;
   vector[P] mu_c;
-  real sigma_m;
   vector[M] mu_m;
-  real sigma_pop;
   vector[Pop] mu_pop;
-  real mu_e_bias;
-  real sd_e_bias;
   vector[current_T] e_bias;
-  real sigma_measure_noise_national;
-  real sigma_measure_noise_state;
-  vector[S] polling_error;  
+  vector[S] polling_error = cholesky_ss_cov_error * raw_polling_error;
+  vector[T] national_mu_b_average;
+  real national_polling_error_average = transpose(polling_error) * state_weights;
   //*** containers
   vector[N_state] logit_pi_democrat_state;
   vector[N_national] logit_pi_democrat_national;
   //*** construct parameters
-  alpha = mu_alpha + raw_alpha * sigma_alpha;
-  polling_error = cholesky_ss_corr_error * raw_polling_error; // cholesky decomposition
-  sigma_a = raw_sigma_a * prior_sigma_a;
-  mu_a[current_T] = 0;
-  for (t in 1:(current_T - 1)) mu_a[current_T - t] = mu_a[current_T - t + 1] + raw_mu_a[current_T - t + 1] * sigma_a; 
-  sigma_b = raw_sigma_b * prior_sigma_b;
-  mu_b[:,T] = cholesky_ss_corr_mu_b_T * raw_mu_b_T + mu_b_prior;
-  for (t in 1:(T - current_T)) mu_b[:, T - t] = cholesky_ss_corr_mu_b_walk * raw_mu_b[:, T - t] + mu_b[:, T - t + 1];
-  for (t in 1:(current_T - 1)) mu_b[:, current_T - t] = cholesky_ss_corr_mu_b_walk * raw_mu_b[:, current_T - t] + mu_b[:, current_T - t + 1];
-  //for (t in 1:(current_T - 1)) mu_b[:, current_T - t] = mu_b[:, current_T - t + 1] + raw_mu_b[:, current_T - t] * sigma_b;
-  sigma_c = raw_sigma_c * prior_sigma_c;
-  sigma_m = raw_sigma_m * prior_sigma_m;
-  sigma_pop = raw_sigma_pop * prior_sigma_pop;
+  mu_a[T] = 0;
+  for (i in 1:(T-1)) mu_a[T - i] = raw_mu_a[T - i] * sigma_a + mu_a[T + 1 - i];
+  mu_b[:,T] = cholesky_ss_cov_mu_b_T * raw_mu_b_T * mu_b_T_model_estimation_error + mu_b_prior;
+  for (i in 1:(T-1)) mu_b[:, T - i] = cholesky_ss_cov_mu_b_walk * raw_mu_b[:, T - i] + mu_b[:, T + 1 - i];
+  national_mu_b_average = transpose(mu_b) * state_weights;
   mu_c = raw_mu_c * sigma_c;
   mu_m = raw_mu_m * sigma_m;
   mu_pop = raw_mu_pop * sigma_pop;
-  sd_e_bias = sqrt(1 - rho_bias^2);
-  mu_e_bias = raw_mu_e_bias * prior_sigma_mu_e_bias;
-  e_bias[1] = raw_e_bias[1];
-  for (t in 2:current_T) e_bias[t] = e_bias[t - 1] + raw_e_bias[t] * sd_e_bias;
-  e_bias = mu_e_bias + e_bias * prior_sigma_e_bias;
-  sigma_measure_noise_national = raw_sigma_measure_noise_national * prior_sigma_measure_noise;
-  sigma_measure_noise_state = raw_sigma_measure_noise_state * prior_sigma_measure_noise;
+  e_bias[1] = raw_e_bias[1] * sigma_e_bias;
+  for (t in 2:current_T) e_bias[t] = mu_e_bias + rho_e_bias * (e_bias[t - 1] - mu_e_bias) + raw_e_bias[t] * sigma_e_bias * sqrt(1-rho_e_bias^2);
   //*** fill pi_democrat
   for (i in 1:N_state){
     logit_pi_democrat_state[i] = 
@@ -124,40 +93,35 @@ transformed parameters {
       mu_m[poll_mode_state[i]] + 
       mu_pop[poll_pop_state[i]] + 
       unadjusted_state[i] * e_bias[day_state[i]] +
-      measure_noise_state[i] * sigma_measure_noise_state + polling_error[state[i]];
+      raw_measure_noise_state[i] * sigma_measure_noise_state + 
+      polling_error[state[i]];
   }
   logit_pi_democrat_national = 
     mu_a[day_national] + 
-    alpha + 
+    national_mu_b_average[day_national] + 
     mu_c[poll_national] + 
     mu_m[poll_mode_national] + 
     mu_pop[poll_pop_national] + 
     unadjusted_national .* e_bias[day_national] +
-    measure_noise_national * sigma_measure_noise_national;
+    raw_measure_noise_national * sigma_measure_noise_national +
+    national_polling_error_average;
 }
+
 model {
   //*** priors
-  raw_alpha ~ std_normal();
-  raw_sigma_a ~ std_normal();
   raw_mu_a ~ std_normal();
-  raw_mu_b_T ~ student_t(17,0,1);
-  raw_sigma_b ~ std_normal();
+  raw_mu_b_T ~ std_normal();
+  mu_b_T_model_estimation_error ~ scaled_inv_chi_square(7, 1);
   to_vector(raw_mu_b) ~ std_normal();
-  raw_sigma_c ~ std_normal();
   raw_mu_c ~ std_normal();
-  raw_sigma_m ~ std_normal();
   raw_mu_m ~ std_normal();
-  raw_sigma_pop ~ std_normal();
   raw_mu_pop ~ std_normal();
-  raw_mu_e_bias ~ std_normal();
-  raw_sigma_e_bias ~ std_normal();
-  rho_bias ~ normal(0.5, 0.25);
+  mu_e_bias ~ normal(0, 0.06);
+  rho_e_bias ~ normal(0.5, 0.25);
   raw_e_bias ~ std_normal();
-  raw_sigma_measure_noise_state ~ std_normal();
-  raw_sigma_measure_noise_national ~ std_normal();
-  measure_noise_national ~ std_normal();
-  measure_noise_state ~ std_normal();
-  raw_polling_error ~ student_t(4,0,1);
+  raw_measure_noise_national ~ std_normal();
+  raw_measure_noise_state ~ std_normal();
+  raw_polling_error ~ std_normal();
   //*** likelihood
   n_democrat_state ~ binomial_logit(n_two_share_state, logit_pi_democrat_state);
   n_democrat_national ~ binomial_logit(n_two_share_national, logit_pi_democrat_national);
@@ -166,7 +130,7 @@ model {
 generated quantities {
   matrix[T, S] predicted_score;
   for (s in 1:S){
-    predicted_score[1:current_T, s] = inv_logit(mu_a[1:current_T] + to_vector(mu_b[s, 1:current_T]));
-    predicted_score[(current_T + 1):T, s] = inv_logit(to_vector(mu_b[s, (current_T + 1):T]));
+    predicted_score[1:T, s] = inv_logit(mu_a[1:T] + to_vector(mu_b[s, 1:T]));
   }
 }
+

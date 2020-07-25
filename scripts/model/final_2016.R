@@ -99,9 +99,9 @@ df <- df %>%
          n_respondents = round(n),
          # clinton
          n_clinton = round(n * clinton/100),
-         p_clinton = clinton/two_party_sum,
+         pct_clinton = clinton/two_party_sum,
          n_trump = round(n * trump/100),
-         p_trump = trump/two_party_sum)
+         pct_trump = trump/two_party_sum)
 first_day <- min(df$start.date)
 # prepare stan data -----------------------------------------------------------
 
@@ -217,8 +217,11 @@ new_diag <- pbsapply(target_se, cl=parallel::detectCores()-1, function(x){find_s
 diag(state_correlation_mu_b_T) <- ifelse(new_diag > diag(state_correlation_mu_b_T), new_diag, diag(state_correlation_mu_b_T))
 
 # covariance matrix for random walks
-state_correlation_mu_b_walk <- cov_matrix(51, (0.01)^2, 0.9) 
+state_correlation_mu_b_walk <- cov_matrix(51, (0.012)^2, 0.9) 
 state_correlation_mu_b_walk <- state_correlation_mu_b_walk * state_correlation
+
+# how much error is this?
+round(100*sqrt(as.numeric(300)) * sd(inv.logit(rnorm(1e5, 0, sqrt(state_correlation_mu_b_walk[1,1]))))*1.96, 1)
 
 ## --- numerical indices
 df <- df %>% 
@@ -238,8 +241,8 @@ df <- df %>%
     # poll information
     state, t, begin, end, pollster, polltype, method = mode, n_respondents, 
     # vote shares
-    p_clinton, n_clinton, 
-    p_trump, n_trump, 
+    pct_clinton, n_clinton, 
+    pct_trump, n_trump, 
     poll_day, index_s, index_p, index_m, index_pop, index_t)
 all_polled_states <- df$state %>% unique %>% sort
 # day indices
@@ -279,6 +282,31 @@ names(state_weights) <- state_abb
 ev_state <- states2012$ev
 names(ev_state) <- state_abb
 
+
+
+# checking parameters -----------------------------------------------------
+# testing that out
+y <- MASS::mvrnorm(1000, rep(0,51), state_correlation_mu_b_T)
+
+z <- matrix(state_weights,nrow=1000,ncol=51,byrow = TRUE)
+
+national_average <- apply(inv.logit(y) * z, 1, sum)
+
+mean(national_average)
+sd(national_average)
+
+# errs since 1968
+err <- c(0.5,1.9,0.8,7.2,1.0,1.4,0.1,3.3,3.4,0.9,0.3,2.7,1) / 2 
+sqrt(mean(err^2))
+
+# extra model specification error
+hist(rnorm(10000) * 2.5, breaks = 100)
+hist(rt(10000,4) * 3.2, breaks = 100)
+hist(rt(10000,7) * 3.2, breaks = 100)
+
+# random walks
+plot(cumsum(rt(300,7)*0.63), type="l")
+sqrt(300) * (inv.logit(0.025)-0.5)
 
 ##### Creating priors --------------
 # read in abramowitz data
@@ -358,18 +386,13 @@ unadjusted_state <- df %>% mutate(unadjusted = ifelse(!(pollster %in% adjusters)
 
                                    
 # priors ---
-prior_sigma_measure_noise <- 0.01 ### 0.1 / 2
-prior_sigma_a <- 0.03 ### 0.05 / 2
-prior_sigma_b <- 0.04 ### 0.05 / 2
-mu_b_prior <- mu_b_prior
-prior_sigma_c <- 0.02 ### 0.1 / 2
-prior_sigma_m <- 0.02 ### 0.1 / 2
-prior_sigma_pop <- 0.02 ### 0.1 / 2
-prior_sigma_e_bias <- 0.03
-prior_sigma_mu_e_bias <- 0.03
-mu_alpha <- alpha_prior
-sigma_alpha <- 0.2  ### 0.2
-prior_sigma_eta <- 0.2
+sigma_measure_noise_national <- 0.06
+sigma_measure_noise_state <- 0.06
+sigma_a <- 0.025
+sigma_c <- 0.06
+sigma_m <- 0.04
+sigma_pop <- 0.04
+sigma_e_bias <- 0.08
 
 # data ---
 data <- list(
@@ -381,6 +404,7 @@ data <- list(
   M = M,
   Pop = Pop,
   state = state,
+  state_weights = state_weights,
   day_state = as.integer(day_state),
   day_national = as.integer(day_national),
   poll_state = poll_state,
@@ -396,47 +420,19 @@ data <- list(
   unadjusted_national = unadjusted_national,
   unadjusted_state = unadjusted_state,
   current_T = as.integer(current_T),
-  ss_correlation = state_correlation,
-  ss_corr_mu_b_T = state_correlation_mu_b_T,
-  ss_corr_mu_b_walk = state_correlation_mu_b_walk,
-  ss_corr_error = state_correlation_error,
-  prior_sigma_measure_noise = prior_sigma_measure_noise,
-  prior_sigma_a = prior_sigma_a,
-  prior_sigma_b = prior_sigma_b,
+  ss_cov_mu_b_T = state_correlation_mu_b_T,
+  ss_cov_mu_b_walk = state_correlation_mu_b_walk,
+  ss_cov_error = state_correlation_error,
+  sigma_a = sigma_a,
+  sigma_measure_noise_national = sigma_measure_noise_national,
+  sigma_measure_noise_state = sigma_measure_noise_state,
   mu_b_prior = mu_b_prior,
-  prior_sigma_c = prior_sigma_c,
-  prior_sigma_m = prior_sigma_m,
-  prior_sigma_pop = prior_sigma_pop,
-  prior_sigma_e_bias = prior_sigma_e_bias,
-  prior_sigma_mu_e_bias = prior_sigma_mu_e_bias,
-  mu_alpha = mu_alpha,
-  sigma_alpha = sigma_alpha,
-  prior_sigma_eta = prior_sigma_eta
+  sigma_c = sigma_c,
+  sigma_m = sigma_m,
+  sigma_pop = sigma_pop,
+  sigma_e_bias = sigma_e_bias
 )
 
-### Initialization ----
-
-initf2 <- function(chain_id = 1) {
-  list(raw_alpha = abs(rnorm(1)), 
-       raw_mu_a = rnorm(current_T),
-       raw_mu_b = abs(matrix(rnorm(T * (S)), nrow = S, ncol = T)),
-       raw_mu_c = abs(rnorm(P)),
-       raw_mu_m = abs(rnorm(M)),
-       raw_mu_pop = abs(rnorm(Pop)),
-       measure_noise_national = abs(rnorm(N_national)),
-       measure_noise_state = abs(rnorm(N_state)),
-       raw_polling_error = abs(rnorm(S)),
-       sigma_measure_noise_national = abs(rnorm(1, 0, prior_sigma_measure_noise)),
-       sigma_measure_noise_state = abs(rnorm(1, 0, prior_sigma_measure_noise)),
-       sigma_mu_a = abs(rnorm(1, 0, prior_sigma_a)),
-       sigma_mu_b = abs(rnorm(1, 0, prior_sigma_b)),
-       sigma_mu_c = abs(rnorm(1, 0, prior_sigma_c)),
-       sigma_mu_m = abs(rnorm(1, 0, prior_sigma_m)),
-       sigma_mu_pop = abs(rnorm(1, 0, prior_sigma_pop))
-  )
-}
-
-init_ll <- lapply(1:n_chains, function(id) initf2(chain_id = id))
 
 ### Run ----
 #model <- rstan::stan_model("scripts/model/poll_model_2020_no_partisan_correction.stan")
@@ -444,7 +440,7 @@ init_ll <- lapply(1:n_chains, function(id) initf2(chain_id = id))
 model <- rstan::stan_model("scripts/model/poll_model_2020.stan")
 out <- rstan::sampling(model, data = data,
                        refresh = n_refresh,
-                       chains  = n_chains, iter = n_iter, warmup = n_warmup, init = init_ll
+                       chains  = n_chains, iter = n_iter, warmup = n_warmup,
 )
 
 
@@ -454,13 +450,6 @@ write_rds(out, sprintf('models/stan_model_%s.rds',RUN_DATE),compress = 'gz')
 ### Extract results ----
 out <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
 
-# sigmas
-tibble(sigma_national = rstan::extract(out, pars = "sigma_a")[[1]],
-       sigma_state = rstan::extract(out, pars = "sigma_b")[[1]]) %>%
-  gather(parameter,value) %>%
-  ggplot(.,aes(x=value)) +
-  geom_histogram(binwidth=0.001) +
-  facet_grid(rows=vars(parameter))
 ## --- priors
 ## mu_b_T
 y <- MASS::mvrnorm(1000, mu_b_prior, Sigma = state_correlation_mu_b_T)
@@ -474,20 +463,13 @@ mu_b_t_plt <- mu_b_T %>% arrange(mean) %>%
     geom_errorbar(aes(ymin = low, ymax = high, x = state, color = type), width = 0, position = position_dodge(width = 0.5)) +
     coord_flip() +
     theme_bw()
-## alpha
-alpha_prior_draws <- data.frame(draws = rnorm(1000, mu_alpha, sigma_alpha), type = "prior")
-alpha_posterior_draws <- data.frame(draws = rstan::extract(out, pars = "alpha")[[1]], type = "posterior")
-alpha_draws <- rbind(alpha_prior_draws, alpha_posterior_draws)
-alpha_plt <- alpha_draws %>%
-  ggplot(., aes(x = draws, fill = type)) +
-  geom_histogram(position = "identity", alpha = 0.6, bins = 60) +
-  theme_bw()
+mu_b_t_plt
 ## mu_c
 mu_c_posterior_draws <- rstan::extract(out, pars = "mu_c")[[1]] 
 mu_c_posterior_draws <- data.frame(draws = as.vector(mu_c_posterior_draws),
                                    index_p = sort(rep(seq(1, P), dim(mu_c_posterior_draws)[1])), 
                                    type = "posterior")
-mu_c_prior_draws <- data.frame(draws = rnorm(P * 1000, 0, prior_sigma_c),
+mu_c_prior_draws <- data.frame(draws = rnorm(P * 1000, 0, sigma_c),
                                index_p = sort(rep(seq(1, P), 1000)), 
                                type = "prior")
 mu_c_draws <- rbind(mu_c_posterior_draws, mu_c_prior_draws) 
@@ -515,7 +497,7 @@ mu_m_posterior_draws <- rstan::extract(out, pars = "mu_m")[[1]]
 mu_m_posterior_draws <- data.frame(draws = as.vector(mu_m_posterior_draws),
                                    index_m = sort(rep(seq(1, M), dim(mu_m_posterior_draws)[1])), 
                                    type = "posterior")
-mu_m_prior_draws <- data.frame(draws = rnorm(M * 1000, 0, prior_sigma_m),
+mu_m_prior_draws <- data.frame(draws = rnorm(M * 1000, 0, sigma_m),
                                index_m = sort(rep(seq(1, M), 1000)), 
                                type = "prior")
 mu_m_draws <- rbind(mu_m_posterior_draws, mu_m_prior_draws) 
@@ -539,7 +521,7 @@ mu_pop_posterior_draws <- rstan::extract(out, pars = "mu_pop")[[1]]
 mu_pop_posterior_draws <- data.frame(draws = as.vector(mu_pop_posterior_draws),
                                    index_pop = sort(rep(seq(1, M), dim(mu_pop_posterior_draws)[1])), 
                                    type = "posterior")
-mu_pop_prior_draws <- data.frame(draws = rnorm(Pop * 1000, 0, prior_sigma_pop),
+mu_pop_prior_draws <- data.frame(draws = rnorm(Pop * 1000, 0, sigma_pop),
                                index_pop = sort(rep(seq(1, Pop), 1000)), 
                                type = "prior")
 mu_pop_draws <- rbind(mu_pop_posterior_draws, mu_pop_prior_draws) 
@@ -593,30 +575,28 @@ non_adjusters <- df %>%
   distinct() %>%
   arrange(index_p)
 
-
-# # mu_d
-# e_bias <- rstan::extract(out, pars = "e_bias")[[1]]
-# plt_adjusted <- lapply(1:100,
-#        function(x){
-#          tibble(e_bias_draw = e_bias[x,] 
-#                 - mean(poll_terms[x, non_adjusters[non_adjusters$unadjusted == 0, 2]$index_p])
-#                 + mean(poll_terms[x, non_adjusters[non_adjusters$unadjusted == 1, 2]$index_p]),
-#                 trial = x) %>%
-#            mutate(date = min(df$end) + row_number()) 
-#        }) %>%
-#   do.call('bind_rows',.) %>%
-#   ggplot(.,aes(x=date,y=e_bias_draw,group=trial)) +
-#   geom_line(alpha=0.2)
-# plt_unadjusted <- lapply(1:100,
-#        function(x){
-#          tibble(e_bias_draw = e_bias[x,],
-#                 trial = x) %>%
-#            mutate(date = min(df$end) + row_number()) 
-#        }) %>%
-#   do.call('bind_rows',.) %>%
-#   ggplot(.,aes(x=date,y=e_bias_draw,group=trial)) +
-#   geom_line(alpha=0.2)
-# grid.arrange(plt_adjusted, plt_unadjusted)
+e_bias <- rstan::extract(out, pars = "e_bias")[[1]]
+plt_adjusted <- lapply(1:100,
+       function(x){
+         tibble(e_bias_draw = e_bias[x,]
+                - mean(poll_terms[x, non_adjusters[non_adjusters$unadjusted == 0, 2]$index_p])
+                + mean(poll_terms[x, non_adjusters[non_adjusters$unadjusted == 1, 2]$index_p]),
+                trial = x) %>%
+           mutate(date = min(df$end) + row_number())
+       }) %>%
+  do.call('bind_rows',.) %>%
+  ggplot(.,aes(x=date,y=e_bias_draw,group=trial)) +
+  geom_line(alpha=0.2)
+plt_unadjusted <- lapply(1:100,
+       function(x){
+         tibble(e_bias_draw = e_bias[x,],
+                trial = x) %>%
+           mutate(date = min(df$end) + row_number())
+       }) %>%
+  do.call('bind_rows',.) %>%
+  ggplot(.,aes(x=date,y=e_bias_draw,group=trial)) +
+  geom_line(alpha=0.2)
+grid.arrange(plt_adjusted, plt_unadjusted)
 
 # states
 predicted_score <- rstan::extract(out, pars = "predicted_score")[[1]]
@@ -628,7 +608,7 @@ single_draw %>%
   select(AL,CA,FL,MN,NC,NM,RI,WI) %>%  #NV,FL,WI,MI,NH,OH,IA,NC,IN
   cor 
 
-p_clinton <- pblapply(1:dim(predicted_score)[3],
+pct_clinton <- pblapply(1:dim(predicted_score)[3],
                     function(x){
                       # pred is mu_a + mu_b for the past, just mu_b for the future
                       temp <- predicted_score[,,x]
@@ -642,15 +622,15 @@ p_clinton <- pblapply(1:dim(predicted_score)[3],
                       
                     }) %>% do.call('bind_rows',.)
 
-p_clinton$state = colnames(state_correlation)[p_clinton$state]
+pct_clinton$state = colnames(state_correlation)[pct_clinton$state]
 
-p_clinton <- p_clinton %>%
+pct_clinton <- pct_clinton %>%
   group_by(state) %>%
   mutate(t = row_number() + min(df$begin)) %>%
   ungroup()
 
 # national
-p_clinton_natl <- pblapply(1:dim(predicted_score)[1],
+pct_clinton_natl <- pblapply(1:dim(predicted_score)[1],
                          function(x){
                            # each row is a day for a particular draw
                            temp <- predicted_score[x,,] %>% as.data.frame()
@@ -662,7 +642,7 @@ p_clinton_natl <- pblapply(1:dim(predicted_score)[1],
                              mutate(draw = x)
                          }) %>% do.call('bind_rows',.)
 
-p_clinton_natl <- p_clinton_natl %>%
+pct_clinton_natl <- pct_clinton_natl %>%
   group_by(t) %>%
   summarise(low = quantile(natl_vote,0.05),
             high = quantile(natl_vote,0.95),
@@ -671,24 +651,35 @@ p_clinton_natl <- p_clinton_natl %>%
   mutate(state = '--')
 
 # bind state and national vote
-p_clinton <- p_clinton %>%
-  bind_rows(p_clinton_natl) %>%
+pct_clinton <- pct_clinton %>%
+  bind_rows(pct_clinton_natl) %>%
   arrange(desc(mean))
 
 # look
 ex_states <- c('IA','FL','OH','WI','MI','PA','AZ','NC','NH','TX','GA','MN')
-p_clinton %>% filter(t == RUN_DATE,state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/1.68) %>% dplyr::select(-t)
+pct_clinton %>% filter(t == RUN_DATE,state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/1.68) %>% dplyr::select(-t) %>% print
+
+map.gg <- urbnmapr::states %>%
+  left_join(pct_clinton %>% filter(t == max(t)) %>%
+              select(state_abbv=state,prob)) %>%
+  ggplot(aes(x=long,y=lat,group=group,fill=prob)) +
+  geom_polygon()  + 
+  coord_map("albers",lat0=39, lat1=45) +
+  scale_fill_gradient2(high='blue',low='red',mid='white',midpoint=0.5) +
+  theme_void()
+
+print(map.gg)
 
 # electoral college by simulation
 draws <- pblapply(1:dim(predicted_score)[3],
              function(x){
                # pred is mu_a + mu_b for the past, just mu_b for the future
-               p_clinton <- predicted_score[,,x]
+               pct_clinton <- predicted_score[,,x]
                
-               p_clinton <- p_clinton %>%
+               pct_clinton <- pct_clinton %>%
                  as.data.frame() %>%
                  mutate(draw = row_number()) %>%
-                 gather(t,p_clinton,1:(ncol(.)-1)) %>%
+                 gather(t,pct_clinton,1:(ncol(.)-1)) %>%
                  mutate(t = as.numeric(gsub('V','',t)) + min(df$begin),
                         state = colnames(state_correlation)[x]) 
          }) %>% do.call('bind_rows',.)
@@ -697,7 +688,7 @@ draws <- pblapply(1:dim(predicted_score)[3],
 sim_evs <- draws %>%
   left_join(states2012 %>% select(state,ev),by='state') %>%
   group_by(t,draw) %>%
-  summarise(dem_ev = sum(ev * (p_clinton > 0.5))) %>%
+  summarise(dem_ev = sum(ev * (pct_clinton > 0.5))) %>%
   group_by(t) %>%
   summarise(mean_dem_ev = mean(dem_ev),
             high_dem_ev = quantile(dem_ev,0.975),
@@ -705,21 +696,21 @@ sim_evs <- draws %>%
             prob = mean(dem_ev >= 270))
 
 identifier <- paste0(Sys.Date()," || " , out@model_name)
-natl_polls.gg <- p_clinton %>%
+natl_polls.gg <- pct_clinton %>%
   filter(state == '--') %>%
-  left_join(df %>% select(state,t,p_clinton,method)) %>% # plot over time
+  left_join(df %>% select(state,t,pct_clinton,method)) %>% # plot over time
   # plot
   ggplot(.,aes(x=t)) +
   geom_ribbon(aes(ymin=low,ymax=high),col=NA,alpha=0.2) +
   geom_hline(yintercept = 0.5) +
   geom_hline(yintercept = national_mu_prior,linetype=2) +
-  geom_point(aes(y=p_clinton,shape=method),alpha=0.3) +
+  geom_point(aes(y=pct_clinton,shape=method),alpha=0.3) +
   geom_line(aes(y=mean)) +
   facet_wrap(~state) +
   theme_minimal()  +
   theme(legend.position = 'none') +
   scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b') +
-  labs(subtitle='p_clinton national')
+  labs(subtitle='pct_clinton national')
 
 natl_evs.gg <-  ggplot(sim_evs, aes(x=t)) +
   geom_hline(yintercept = 270) +
@@ -730,20 +721,20 @@ natl_evs.gg <-  ggplot(sim_evs, aes(x=t)) +
   scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b') +
   labs(subtitletitle='clinton evs')
 
-state_polls.gg <- p_clinton %>%
+state_polls.gg <- pct_clinton %>%
   filter(state %in% ex_states) %>%
-  left_join(df %>% select(state,t,p_clinton,method)) %>% # plot over time
+  left_join(df %>% select(state,t,pct_clinton,method)) %>% # plot over time
   ggplot(.,aes(x=t,col=state)) +
   geom_ribbon(aes(ymin=low,ymax=high),col=NA,alpha=0.2) +
   geom_hline(yintercept = 0.5) +
-  geom_point(aes(y=p_clinton,shape=method),alpha=0.3) +
+  geom_point(aes(y=pct_clinton,shape=method),alpha=0.3) +
   geom_line(aes(y=mean)) +
   facet_wrap(~state) +
   theme_minimal()  +
   theme(legend.position = 'top') +
   guides(color='none') +
   scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b') +
-  labs(subtitle='p_clinton state')
+  labs(subtitle='pct_clinton state')
 
 grid.arrange(natl_polls.gg, natl_evs.gg, state_polls.gg, 
              layout_matrix = rbind(c(1,1,3,3,3),
@@ -758,7 +749,7 @@ tipping_point <- draws %>%
   left_join(states2012 %>% dplyr::select(state,ev),by='state') %>%
   left_join(enframe(state_weights,'state','weight')) %>%
   group_by(draw) %>%
-  mutate(dem_nat_pop_vote = weighted.mean(p_clinton,weight))
+  mutate(dem_nat_pop_vote = weighted.mean(pct_clinton,weight))
 
 tipping_point <- pblapply(1:max(tipping_point$draw),
                           cl = parallel::detectCores() - 1,
@@ -766,9 +757,9 @@ tipping_point <- pblapply(1:max(tipping_point$draw),
                             temp <- tipping_point[tipping_point$draw==x,]
                             
                             if(temp$dem_nat_pop_vote > 0.5){
-                              temp <- temp %>% arrange(desc(p_clinton))
+                              temp <- temp %>% arrange(desc(pct_clinton))
                             }else{
-                              temp <- temp %>% arrange(p_clinton)
+                              temp <- temp %>% arrange(pct_clinton)
                             }
                             
                             return(temp)
@@ -802,11 +793,11 @@ ggplot(sim_evs, aes(x=t)) +
 
 
 # now-cast probability over time all states
-p_clinton %>%
+pct_clinton %>%
   ggplot(.,aes(x=t,y=prob,col=state)) +
   geom_hline(yintercept=0.5) +
   geom_line() +
-  geom_label_repel(data = p_clinton %>% 
+  geom_label_repel(data = pct_clinton %>% 
                      filter(t==max(t),
                             prob > 0.1 & prob < 0.9),
                    aes(label=state)) +
@@ -817,10 +808,10 @@ p_clinton %>%
   labs(subtitle = identifier)
 
 # diff from national over time?
-p_clinton[p_clinton$state != '--',] %>%
-  left_join(p_clinton[p_clinton$state=='--',] %>%
-              select(t,p_clinton_national=mean), by='t') %>%
-  mutate(diff=mean-p_clinton_national) %>%
+pct_clinton[pct_clinton$state != '--',] %>%
+  left_join(pct_clinton[pct_clinton$state=='--',] %>%
+              select(t,pct_clinton_national=mean), by='t') %>%
+  mutate(diff=mean-pct_clinton_national) %>%
   group_by(state) %>%
   mutate(last_prob = last(prob)) %>%
   filter(state %in% ex_states) %>%
@@ -842,7 +833,7 @@ final_evs <- draws %>%
   left_join(states2012 %>% select(state,ev),by='state') %>%
   filter(t==max(t)) %>%
   group_by(draw) %>%
-  summarise(dem_ev = sum(ev* (p_clinton > 0.5)))
+  summarise(dem_ev = sum(ev* (pct_clinton > 0.5)))
 
 ev.gg <- ggplot(final_evs,aes(x=dem_ev,
                      fill=ifelse(dem_ev>=270,'Democratic','Republican'))) +
@@ -862,7 +853,7 @@ print(ev.gg)
 # https://www.buzzfeednews.com/article/jsvine/2016-election-forecast-grades
 ev_state <- enframe(ev_state)
 colnames(ev_state) <- c("state", "ev")
-compare <- p_clinton %>% 
+compare <- pct_clinton %>% 
   filter(t==max(t),state!='--') %>% 
   select(state,clinton_win=prob) %>% 
   mutate(clinton_win_actual = ifelse(state %in% c('CA','NV','OR','WA','CO','NM','MN','IL','VA','DC','MD','DE','NJ','CT','RI','MA','NH','VT','NY','HI','ME'),1,0),

@@ -35,7 +35,7 @@ cov_matrix <- function(n, sigma2, rho){
 }
 
 ## Master variables
-RUN_DATE <- ymd("2008-11-03")
+RUN_DATE <- ymd("2008-07-23")
 
 election_day <- ymd("2008-11-03")
 start_date <- as.Date("2008-03-01") # Keeping all polls after March 1, 2008
@@ -206,6 +206,7 @@ target_se = read_csv("data/state_priors_08_12_16.csv") %>%
   arrange(date) %>%
   filter(date == max(date)) %>%
   pull(se)
+target_se <- ifelse(target_se<0.04,0.04,target_se)
 
 state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = find_sigma2_value(empirical_sd = median(target_se))$minimum^2, rho = 0.9) # 6% on elec day
 state_correlation_mu_b_T <- state_correlation_mu_b_T * state_correlation
@@ -214,7 +215,7 @@ new_diag <- pbsapply(target_se, cl=parallel::detectCores()-1, function(x){find_s
 diag(state_correlation_mu_b_T) <- ifelse(new_diag > diag(state_correlation_mu_b_T), new_diag, diag(state_correlation_mu_b_T))
 
 # covariance matrix for random walks
-state_correlation_mu_b_walk <- cov_matrix(51, (0.01)^2, 0.9) 
+state_correlation_mu_b_walk <- cov_matrix(51, (0.012)^2, 0.9) 
 state_correlation_mu_b_walk <- state_correlation_mu_b_walk * state_correlation
 
 
@@ -425,28 +426,6 @@ data <- list(
   prior_sigma_eta = prior_sigma_eta
 )
 
-### Initialization ----
-
-n_chains <- 4
-
-initf2 <- function(chain_id = 1) {
-  # cat("chain_id =", chain_id, "\n")
-  list(raw_alpha = abs(rnorm(1)), 
-       raw_mu_a = rnorm(current_T),
-       raw_mu_b = abs(matrix(rnorm(T * (S)), nrow = S, ncol = T)),
-       raw_mu_c = abs(rnorm(P)),
-       measure_noise_national = abs(rnorm(N_national)),
-       measure_noise_state = abs(rnorm(N_state)),
-       raw_polling_error = abs(rnorm(S)),
-       sigma_measure_noise_national = abs(rnorm(1, 0, prior_sigma_measure_noise)),
-       sigma_measure_noise_state = abs(rnorm(1, 0, prior_sigma_measure_noise)),
-       sigma_mu_a = abs(rnorm(1, 0, prior_sigma_a)),
-       sigma_mu_b = abs(rnorm(1, 0, prior_sigma_b)),
-       sigma_mu_c = abs(rnorm(1, 0, prior_sigma_c))
-  )
-}
-
-init_ll <- lapply(1:n_chains, function(id) initf2(chain_id = id))
 
 ### Run ----
 
@@ -460,7 +439,7 @@ model <- rstan::stan_model("scripts/model/poll_model_2020_no_mode_adjustment.sta
 # run model
 out <- rstan::sampling(model, data = data,
                        refresh=50,
-                       chains = 4, iter = 1000, warmup=500, init = init_ll
+                       chains = 4, iter = 1000, warmup=500
 )
 
 
@@ -576,16 +555,18 @@ p_obama <- p_obama %>%
 
 # look
 ex_states <- c('IA','FL','OH','WI','MI','PA','AZ','NC','NH','TX','GA','MN')
-p_obama %>% filter(t == RUN_DATE,state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/1.68) %>% dplyr::select(-t)
+p_obama %>% filter(t == RUN_DATE,state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/1.68) %>% dplyr::select(-t) %>% print
 
-urbnmapr::states %>%
+map.gg <- urbnmapr::states %>%
   left_join(p_obama %>% filter(t == max(t)) %>%
               select(state_abbv=state,prob)) %>%
   ggplot(aes(x=long,y=lat,group=group,fill=prob)) +
   geom_polygon()  + 
   coord_map("albers",lat0=39, lat1=45) +
   scale_fill_gradient2(high='blue',low='red',mid='white',midpoint=0.5) +
-  theme_void()
+  theme_void() 
+
+print(map.gg)
 
 
 # electoral college by simulation

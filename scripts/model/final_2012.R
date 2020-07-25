@@ -35,7 +35,7 @@ cov_matrix <- function(n, sigma2, rho){
 }
 
 ## Master variables
-RUN_DATE <- ymd("2012-11-06")
+RUN_DATE <- ymd("2012-07-23")
 
 election_day <- ymd("2012-11-06")
 start_date <- as.Date("2012-03-01") # Keeping all polls after March 1, 2012
@@ -206,6 +206,7 @@ target_se = read_csv("data/state_priors_08_12_16.csv") %>%
   arrange(date) %>%
   filter(date == max(date)) %>%
   pull(se)
+target_se <- ifelse(target_se<0.04,0.04,target_se)
 
 state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = find_sigma2_value(empirical_sd = median(target_se))$minimum^2, rho = 0.9) # 6% on elec day
 state_correlation_mu_b_T <- state_correlation_mu_b_T * state_correlation
@@ -214,8 +215,10 @@ new_diag <- pbsapply(target_se, cl=parallel::detectCores()-1, function(x){find_s
 diag(state_correlation_mu_b_T) <- ifelse(new_diag > diag(state_correlation_mu_b_T), new_diag, diag(state_correlation_mu_b_T))
 
 # covariance matrix for random walks
-state_correlation_mu_b_walk <- cov_matrix(51, (0.01)^2, 0.9) 
+state_correlation_mu_b_walk <- cov_matrix(51, (0.012)^2, 0.9) 
 state_correlation_mu_b_walk <- state_correlation_mu_b_walk * state_correlation
+
+round(100*sqrt(as.numeric(300)) * sd(inv.logit(rnorm(1e5, 0, sqrt(state_correlation_mu_b_walk[1,1]))))*1.96, 1)
 
 
 # final poll wrangling ----
@@ -586,10 +589,10 @@ p_obama <- p_obama %>%
 
 # look
 ex_states <- c('IA','FL','OH','WI','MI','PA','AZ','NC','NH','TX','GA','MN')
-p_obama %>% filter(t == RUN_DATE,state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/1.68) %>% dplyr::select(-t)
+p_obama %>% filter(t == RUN_DATE,state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/1.68) %>% dplyr::select(-t) %>% print
 
 
-urbnmapr::states %>%
+map.gg <- urbnmapr::states %>%
   left_join(p_obama %>% filter(t == max(t)) %>%
               select(state_abbv=state,prob)) %>%
   ggplot(aes(x=long,y=lat,group=group,fill=prob)) +
@@ -598,6 +601,7 @@ urbnmapr::states %>%
   scale_fill_gradient2(high='blue',low='red',mid='white',midpoint=0.5) +
   theme_void()
 
+print(map.gg)
 
 # electoral college by simulation
 draws <- pblapply(1:dim(predicted_score)[3],
