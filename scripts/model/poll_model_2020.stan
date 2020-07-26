@@ -52,7 +52,7 @@ parameters {
   vector[M] raw_mu_m;
   vector[Pop] raw_mu_pop;
   real<offset=0, multiplier=0.06> mu_e_bias;
-  real<offset=0, multiplier=0.06> rho_e_bias;
+  real<lower = 0, upper = 1> rho_e_bias;
   vector[current_T] raw_e_bias;
   vector[N_national] raw_measure_noise_national;
   vector[N_state] raw_measure_noise_state;
@@ -75,8 +75,11 @@ transformed parameters {
   vector[N_state] logit_pi_democrat_state;
   vector[N_national] logit_pi_democrat_national;
   //*** construct parameters
-  mu_a[T] = 0;
-  for (i in 1:(T-1)) mu_a[T - i] = raw_mu_a[T - i] * sigma_a + mu_a[T + 1 - i];
+  //mu_a[T] = 0;
+  //for (i in 1:(T-1)) mu_a[T - i] = raw_mu_a[T - i] * sigma_a + mu_a[T + 1 - i];
+  //mu_a[current_T] = 0;
+  //for (t in 1:(current_T - 1)) mu_a[current_T - t] = mu_a[current_T - t + 1] + raw_mu_a[current_T - t + 1] * sigma_a; 
+  for(i in 1:T) mu_a[i] = 0; // What if we take out mu_a?
   mu_b[:,T] = cholesky_ss_cov_mu_b_T * raw_mu_b_T * mu_b_T_model_estimation_error + mu_b_prior;
   for (i in 1:(T-1)) mu_b[:, T - i] = cholesky_ss_cov_mu_b_walk * raw_mu_b[:, T - i] + mu_b[:, T + 1 - i];
   national_mu_b_average = transpose(mu_b) * state_weights;
@@ -100,13 +103,13 @@ transformed parameters {
   }
   logit_pi_democrat_national = 
     mu_a[day_national] + 
-    national_mu_b_average[day_national] + 
+    national_mu_b_average[day_national] +  
     mu_c[poll_national] + 
     mu_m[poll_mode_national] + 
     mu_pop[poll_pop_national] + 
     unadjusted_national .* e_bias[day_national] +
     raw_measure_noise_national * sigma_measure_noise_national +
-    national_polling_error_average;
+    national_polling_error_average;  
 }
 
 model {
@@ -118,8 +121,8 @@ model {
   raw_mu_c ~ std_normal();
   raw_mu_m ~ std_normal();
   raw_mu_pop ~ std_normal();
-  mu_e_bias ~ normal(0, 0.06);
-  rho_e_bias ~ normal(0.5, 0.25);
+  mu_e_bias ~ normal(0, 0.02);
+  rho_e_bias ~ normal(0.7, 0.1);
   raw_e_bias ~ std_normal();
   raw_measure_noise_national ~ std_normal();
   raw_measure_noise_state ~ std_normal();
@@ -129,10 +132,17 @@ model {
   n_democrat_national ~ binomial_logit(n_two_share_national, logit_pi_democrat_national);
 }
 
+// generated quantities {
+//   matrix[T, S] predicted_score;
+//   for (s in 1:S){
+//     predicted_score[1:T, s] = inv_logit(mu_a[1:T] + to_vector(mu_b[s, 1:T]));
+//   }
+// }
 generated quantities {
   matrix[T, S] predicted_score;
   for (s in 1:S){
-    predicted_score[1:T, s] = inv_logit(mu_a[1:T] + to_vector(mu_b[s, 1:T]));
+    predicted_score[1:current_T, s] = inv_logit(mu_a[1:current_T] + to_vector(mu_b[s, 1:current_T]));
+    predicted_score[(current_T + 1):T, s] = inv_logit(to_vector(mu_b[s, (current_T + 1):T]));
   }
 }
 

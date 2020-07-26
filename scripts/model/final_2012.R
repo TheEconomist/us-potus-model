@@ -35,7 +35,7 @@ cov_matrix <- function(n, sigma2, rho){
 }
 
 ## Master variables
-RUN_DATE <- ymd("2012-07-23")
+RUN_DATE <- ymd("2012-11-06")
 
 election_day <- ymd("2012-11-06")
 start_date <- as.Date("2012-03-01") # Keeping all polls after March 1, 2012
@@ -89,18 +89,16 @@ df <- df %>%
          n_respondents = round(n),
          # obama
          n_obama = round(n * obama/100),
-         p_obama = obama/two_party_sum,
+         pct_obama = obama/two_party_sum,
          # romney
          n_romney = round(n * romney/100),
-         p_romney = romney/two_party_sum,
+         pct_romney = romney/two_party_sum,
          # third-party
          n_other = round(n * other/100),
          p_other = other/100)
 
 
-# prepare stan date -----------------------------------------------------------
-
-# create correlation matrix ---------------------------------------------
+# prepare stan data -----------------------------------------------------------
 
 ## --- create correlation matrix
 state_data <- read.csv("data/potus_results_76_16.csv")
@@ -206,7 +204,6 @@ target_se = read_csv("data/state_priors_08_12_16.csv") %>%
   arrange(date) %>%
   filter(date == max(date)) %>%
   pull(se)
-target_se <- ifelse(target_se<0.04,0.04,target_se)
 
 state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = find_sigma2_value(empirical_sd = median(target_se))$minimum^2, rho = 0.9) # 6% on elec day
 state_correlation_mu_b_T <- state_correlation_mu_b_T * state_correlation
@@ -241,8 +238,8 @@ df <- df %>%
     # poll information
     state, t, begin, end, pollster, polltype, method = mode, n_respondents, 
     # vote shares
-    p_obama, n_obama, 
-    p_romney, n_romney, 
+    pct_obama, n_obama, 
+    pct_romney, n_romney, 
     p_other, n_other, poll_day, index_s, index_p, index_t) %>%
   mutate(index_s = ifelse(index_s == 1, 52, index_s - 1)) # national index = 51
 
@@ -386,16 +383,12 @@ unadjusted_state <- df %>% mutate(unadjusted = ifelse(!(pollster %in% adjusters)
 
 
 # priors ---
-prior_sigma_measure_noise <- 0.01 ### 0.1 / 2
-prior_sigma_a <- 0.03 ### 0.05 / 2
-prior_sigma_b <- 0.04 ### 0.05 / 2
-mu_b_prior <- mu_b_prior
-prior_sigma_c <- 0.02 ### 0.1 / 2
-prior_sigma_e_bias <- 0.03
-prior_sigma_mu_e_bias <- 0.03
-mu_alpha <- alpha_prior
-sigma_alpha <- 0.2  ### 0.2
-prior_sigma_eta <- 0.2
+sigma_measure_noise_national <- 0.06
+sigma_measure_noise_state <- 0.06
+sigma_a <- 0.02
+sigma_c <- 0.06
+sigma_m <- 0.04
+sigma_pop <- 0.04
 
 # data ---
 data <- list(
@@ -405,6 +398,7 @@ data <- list(
   S = S,
   P = P,
   state = state,
+  state_weights = state_weights,
   day_state = as.integer(day_state),
   day_national = as.integer(day_national),
   poll_state = poll_state,
@@ -413,52 +407,19 @@ data <- list(
   n_democrat_state = n_democrat_state,
   n_two_share_national = n_two_share_national,
   n_two_share_state = n_two_share_state,
-  unadjusted_national = unadjusted_national,
-  unadjusted_state = unadjusted_state,
   current_T = as.integer(current_T),
-  ss_correlation = state_correlation,
-  ss_corr_mu_b_T = state_correlation_mu_b_T,
-  ss_corr_mu_b_walk = state_correlation_mu_b_walk,
-  ss_corr_error = state_correlation_error,
-  prior_sigma_measure_noise = prior_sigma_measure_noise,
-  prior_sigma_a = prior_sigma_a,
-  prior_sigma_b = prior_sigma_b,
+  ss_cov_mu_b_T = state_correlation_mu_b_T,
+  ss_cov_mu_b_walk = state_correlation_mu_b_walk,
+  ss_cov_error = state_correlation_error,
+  sigma_a = sigma_a,
+  sigma_measure_noise_national = sigma_measure_noise_national,
+  sigma_measure_noise_state = sigma_measure_noise_state,
   mu_b_prior = mu_b_prior,
-  prior_sigma_c = prior_sigma_c,
-  prior_sigma_e_bias = prior_sigma_e_bias,
-  prior_sigma_mu_e_bias = prior_sigma_mu_e_bias,
-  mu_alpha = mu_alpha,
-  sigma_alpha = sigma_alpha,
-  prior_sigma_eta = prior_sigma_eta
+  sigma_c = sigma_c
 )
-
-
-### Initialization ----
-
-n_chains <- 4
-
-initf2 <- function(chain_id = 1) {
-  # cat("chain_id =", chain_id, "\n")
-  list(raw_alpha = abs(rnorm(1)), 
-       raw_mu_a = rnorm(current_T),
-       raw_mu_b = abs(matrix(rnorm(T * (S)), nrow = S, ncol = T)),
-       raw_mu_c = abs(rnorm(P)),
-       measure_noise_national = abs(rnorm(N_national)),
-       measure_noise_state = abs(rnorm(N_state)),
-       raw_polling_error = abs(rnorm(S)),
-       sigma_measure_noise_national = abs(rnorm(1, 0, prior_sigma_measure_noise)),
-       sigma_measure_noise_state = abs(rnorm(1, 0, prior_sigma_measure_noise)),
-       sigma_mu_a = abs(rnorm(1, 0, prior_sigma_a)),
-       sigma_mu_b = abs(rnorm(1, 0, prior_sigma_b)),
-       sigma_mu_c = abs(rnorm(1, 0, prior_sigma_c))
-  )
-}
-
-init_ll <- lapply(1:n_chains, function(id) initf2(chain_id = id))
 
 ### Run ----
 
-#setwd(here("scripts/Stan/Refactored/"))
 
 # read model code
 #model <- rstan::stan_model("scripts/model/poll_model_2020_no_partisan_correction.stan")
@@ -468,7 +429,7 @@ model <- rstan::stan_model("scripts/model/poll_model_2020_no_mode_adjustment.sta
 # run model
 out <- rstan::sampling(model, data = data,
                        refresh=50,
-                       chains = 4, iter = 1000, warmup=500, init = init_ll
+                       chains = 4, iter = 500, warmup=250, 
 )
 
 # save model for today
@@ -477,25 +438,14 @@ write_rds(out, sprintf('models/backtest_2012/stan_model_%s.rds',RUN_DATE),compre
 ### Extract results ----
 # out  <- read_rds(sprintf('models/backtest_2012/stan_model_%s.rds',RUN_DATE))
 
-# etc
-a <- rstan::extract(out, pars = "alpha")[[1]]
-hist(a)
-# sigmas
-tibble(sigma_national = rstan::extract(out, pars = "sigma_a")[[1]],
-       sigma_state = rstan::extract(out, pars = "sigma_b")[[1]]) %>%
-  gather(parameter,value) %>%
-  ggplot(.,aes(x=value)) +
-  geom_histogram(binwidth=0.001) +
-  facet_grid(rows=vars(parameter))
+
 # measurement noise
-measure_noise_national <- rstan::extract(out, pars = "measure_noise_national")[[1]] * mean(rstan::extract(out, pars = "sigma_measure_noise_national")[[1]])
-hist(measure_noise_national)
 ## mu_c
 mu_c_posterior_draws <- rstan::extract(out, pars = "mu_c")[[1]] 
 mu_c_posterior_draws <- data.frame(draws = as.vector(mu_c_posterior_draws),
                                    index_p = sort(rep(seq(1, P), dim(mu_c_posterior_draws)[1])), 
                                    type = "posterior")
-mu_c_prior_draws <- data.frame(draws = rnorm(P * 1000, 0, prior_sigma_c),
+mu_c_prior_draws <- data.frame(draws = rnorm(P * 1000, 0, sigma_c),
                                index_p = sort(rep(seq(1, P), 1000)), 
                                type = "prior")
 mu_c_draws <- rbind(mu_c_posterior_draws, mu_c_prior_draws) 
@@ -517,6 +467,7 @@ mu_c_plt <- mu_c_draws %>%
                 width = 0, position = position_dodge(width = 0.5)) +
   coord_flip() +
   theme_bw()
+mu_c_plt
 #write_csv(mu_c_draws,'output/mu_c_draws_2012.csv')
 # look at variation in mu_a
 mu_a <- rstan::extract(out, pars = "mu_a")[[1]]
@@ -540,7 +491,7 @@ single_draw %>%
   cor 
 
 # states
-p_obama <- pblapply(1:dim(predicted_score)[3],
+pct_obama <- pblapply(1:dim(predicted_score)[3],
                       function(x){
                         # pred is mu_a + mu_b for the past, just mu_b for the future
                         temp <- predicted_score[,,x]
@@ -554,15 +505,15 @@ p_obama <- pblapply(1:dim(predicted_score)[3],
                         
                       }) %>% do.call('bind_rows',.)
 
-p_obama$state = colnames(state_correlation)[p_obama$state]
+pct_obama$state = colnames(state_correlation)[pct_obama$state]
 
-p_obama <- p_obama %>%
+pct_obama <- pct_obama %>%
   group_by(state) %>%
   mutate(t = row_number() + min(df$begin)) %>%
   ungroup()
 
 # national
-p_obama_natl <- pblapply(1:dim(predicted_score)[2],
+pct_obama_natl <- pblapply(1:dim(predicted_score)[2],
                            function(x){
                              # each row is a day for a particular draw
                              temp <- predicted_score[x,,] %>% as.data.frame()
@@ -574,7 +525,7 @@ p_obama_natl <- pblapply(1:dim(predicted_score)[2],
                                mutate(draw = x)
                            }) %>% do.call('bind_rows',.)
 
-p_obama_natl <- p_obama_natl %>%
+pct_obama_natl <- pct_obama_natl %>%
   group_by(t) %>%
   summarise(low = quantile(natl_vote,0.05),
             high = quantile(natl_vote,0.95),
@@ -583,17 +534,17 @@ p_obama_natl <- p_obama_natl %>%
   mutate(state = '--')
 
 # bind state and national vote
-p_obama <- p_obama %>%
-  bind_rows(p_obama_natl) %>%
+pct_obama <- pct_obama %>%
+  bind_rows(pct_obama_natl) %>%
   arrange(desc(mean))
 
 # look
 ex_states <- c('IA','FL','OH','WI','MI','PA','AZ','NC','NH','TX','GA','MN')
-p_obama %>% filter(t == RUN_DATE,state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/1.68) %>% dplyr::select(-t) %>% print
+pct_obama %>% filter(t == RUN_DATE,state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/1.68) %>% dplyr::select(-t) %>% print
 
 
 map.gg <- urbnmapr::states %>%
-  left_join(p_obama %>% filter(t == max(t)) %>%
+  left_join(pct_obama %>% filter(t == max(t)) %>%
               select(state_abbv=state,prob)) %>%
   ggplot(aes(x=long,y=lat,group=group,fill=prob)) +
   geom_polygon()  + 
@@ -607,12 +558,12 @@ print(map.gg)
 draws <- pblapply(1:dim(predicted_score)[3],
                   function(x){
                     # pred is mu_a + mu_b for the past, just mu_b for the future
-                    p_obama <- predicted_score[,,x]
+                    pct_obama <- predicted_score[,,x]
                     
-                    p_obama <- p_obama %>%
+                    pct_obama <- pct_obama %>%
                       as.data.frame() %>%
                       mutate(draw = row_number()) %>%
-                      gather(t,p_obama,1:(ncol(.)-1)) %>%
+                      gather(t,pct_obama,1:(ncol(.)-1)) %>%
                       mutate(t = as.numeric(gsub('V','',t)) + min(df$begin),
                              state = colnames(state_correlation)[x]) 
                     
@@ -623,14 +574,14 @@ draws <- pblapply(1:dim(predicted_score)[3],
 sim_evs <- draws %>%
   left_join(states2008 %>% select(state,ev),by='state') %>%
   group_by(t,draw) %>%
-  summarise(dem_ev = sum(ev * (p_obama > 0.5))) %>%
+  summarise(dem_ev = sum(ev * (pct_obama > 0.5))) %>%
   group_by(t) %>%
   summarise(mean_dem_ev = mean(dem_ev),
             median_dem_ev = median(dem_ev),
             high_dem_ev = quantile(dem_ev,0.975),
             low_dem_ev = quantile(dem_ev,0.025),
             prob = mean(dem_ev >= 270)) %>%
-  left_join(p_obama[p_obama$state != '--',] %>%
+  left_join(pct_obama[pct_obama$state != '--',] %>%
               left_join(states2008 %>% select(state,ev),by='state') %>%
               group_by(t) %>%
               summarise(sum_dem_ev = sum(ev * (prob > 0.5))) )
@@ -639,24 +590,24 @@ sim_evs <- draws %>%
 # add identifier
 identifier <- paste0(Sys.Date()," || " , out@model_name)
 
-natl_polls.gg <- p_obama %>%
+natl_polls.gg <- pct_obama %>%
   filter(state == '--') %>%
-  left_join(df %>% select(state,t,p_obama)) %>% # plot over time
+  left_join(df %>% select(state,t,pct_obama)) %>% # plot over time
   # plot
   ggplot(.,aes(x=t)) +
   
   geom_ribbon(aes(ymin=low,ymax=high),col=NA,alpha=0.2) +
   geom_hline(yintercept = 0.5) +
   geom_hline(yintercept = national_mu_prior,linetype=2) +
-  geom_point(aes(y=p_obama),alpha=0.2) +
-  #geom_smooth(aes(y=p_obama),method='loess',span=0.2,col='black',linetype=2,se=F) +
+  geom_point(aes(y=pct_obama),alpha=0.2) +
+  #geom_smooth(aes(y=pct_obama),method='loess',span=0.2,col='black',linetype=2,se=F) +
   geom_line(aes(y=mean)) +
   facet_wrap(~state) +
   theme_minimal()  +
   theme(legend.position = 'none') +
   scale_x_date(limits=c(ymd('2012-03-01','2012-11-06')),date_breaks='1 month',date_labels='%b') +
   scale_y_continuous(breaks=seq(0,1,0.02)) +
-  labs(subtitle='p_obama national')
+  labs(subtitle='pct_obama national')
 
 natl_evs.gg <-  ggplot(sim_evs, aes(x=t)) +
   geom_hline(yintercept = 270) +
@@ -669,22 +620,22 @@ natl_evs.gg <-  ggplot(sim_evs, aes(x=t)) +
   scale_y_continuous(breaks=seq(0,600,100)) +
   labs(subtitletitle='obama evs')
 
-state_polls.gg <- p_obama %>%
+state_polls.gg <- pct_obama %>%
   filter(state %in% ex_states) %>%
-  left_join(df %>% select(state,t,p_obama)) %>% # plot over time
+  left_join(df %>% select(state,t,pct_obama)) %>% # plot over time
   # plot
   ggplot(.,aes(x=t,col=state)) +
   geom_ribbon(aes(ymin=low,ymax=high),col=NA,alpha=0.2) +
   geom_hline(yintercept = 0.5) +
-  geom_point(aes(y=p_obama),alpha=0.2) +
-  #geom_smooth(aes(y=p_obama,col=state),method='loess',linetype=2,se=F) +
+  geom_point(aes(y=pct_obama),alpha=0.2) +
+  #geom_smooth(aes(y=pct_obama,col=state),method='loess',linetype=2,se=F) +
   geom_line(aes(y=mean)) +
   facet_wrap(~state) +
   theme_minimal()  +
   theme(legend.position = 'none') +
   scale_x_date(limits=c(ymd('2012-03-01','2012-11-06')),date_breaks='1 month',date_labels='%b') +
   scale_y_continuous(breaks=seq(0,1,0.05)) +
-  labs(subtitle='p_obama state')
+  labs(subtitle='pct_obama state')
 
 grid.arrange(natl_polls.gg, natl_evs.gg, state_polls.gg, 
              layout_matrix = rbind(c(1,1,3,3,3),
@@ -705,13 +656,13 @@ ggplot(sim_evs, aes(x=t)) +
 
 
 # now-cast probability over time all states
-p_obama %>%
+pct_obama %>%
   #filter(abs(mean-0.5)<0.2) %>%
   # plot
   ggplot(.,aes(x=t,y=prob,col=state)) +
   geom_hline(yintercept=0.5) +
   geom_line() +
-  geom_label_repel(data = p_obama %>% 
+  geom_label_repel(data = pct_obama %>% 
                      filter(t==max(t),state %in% ex_states),
                    aes(label=state)) +
   theme_minimal()  +
@@ -721,10 +672,10 @@ p_obama %>%
   labs(subtitle = identifier)
 
 # diff from national over time?
-p_obama[p_obama$state != '--',] %>%
-  left_join(p_obama[p_obama$state=='--',] %>%
-              select(t,p_obama_national=mean), by='t') %>%
-  mutate(diff=mean-p_obama_national) %>%
+pct_obama[pct_obama$state != '--',] %>%
+  left_join(pct_obama[pct_obama$state=='--',] %>%
+              select(t,pct_obama_national=mean), by='t') %>%
+  mutate(diff=mean-pct_obama_national) %>%
   group_by(state) %>%
   mutate(last_prob = last(prob)) %>%
   filter(state %in% ex_states) %>%
@@ -743,7 +694,7 @@ p_obama[p_obama$state != '--',] %>%
 
 # brier scores
 # https://www.buzzfeednews.com/article/jsvine/2016-election-forecast-grades
-compare <- p_obama %>% 
+compare <- pct_obama %>% 
   filter(t==max(t),state!='--') %>% 
   select(state,obama_win = prob) %>% 
   mutate(obama_win_actual = ifelse(state %in% c('CA','NV','OR','WA','CO','NM','MN','IL','VA','DC','MD','DE','NJ','CT','RI','MA','NH','VT','NY','HI','ME','MI','IA','OH','PA','WI','FL'),1,0),
@@ -766,7 +717,7 @@ briers.2012 <- tibble(outlet = c('Linzer','Wang/Ferguson','Silver/538','Jackman/
 briers.2012
 
 # model vs final polls vs prior
-p_obama %>%
+pct_obama %>%
   filter(t == max(t),state %in% ex_states) %>%
   mutate(se = (high - mean)/2) %>%
   select(state,model_mean=mean,model_se=se) %>%
@@ -774,7 +725,7 @@ p_obama %>%
               filter(t > (max(t)-14),
                      state %in% ex_states) %>%
               group_by(state) %>%
-              summarise(poll = weighted.mean(p_obama,n_respondents))) %>%
+              summarise(poll = weighted.mean(pct_obama,n_respondents))) %>%
   left_join(enframe(mu_b_prior,'state','prior') %>%
               mutate(prior = inv.logit(prior))) %>%
   ggplot(.,aes(y=state)) +
@@ -787,7 +738,7 @@ final_states <- enframe(mu_b_prior,'state','prior') %>%
   left_join(df %>%
               filter(t > (max(t)-14),) %>%
               group_by(state) %>%
-              summarise(poll = weighted.mean(p_obama,n_respondents))) %>%
+              summarise(poll = weighted.mean(pct_obama,n_respondents))) %>%
   mutate(avg_poll_less_prior = mean(poll - inv.logit(prior), na.rm=T)) %>%
   mutate(poll = ifelse(is.na(poll),
                        inv.logit(prior) + avg_poll_less_prior,
@@ -803,17 +754,17 @@ generated_evs <- lapply(1:ncol(errors),
   bind_cols() %>%
   as.data.frame() %>%
   mutate(trial = row_number()) %>%
-  gather(state,p_obama,1:(ncol(.)-1)) %>%
+  gather(state,pct_obama,1:(ncol(.)-1)) %>%
   left_join(states2008 %>% select(state,ev)) %>%
   group_by(trial) %>%
-  summarise(dem_ev = sum((p_obama>0.5)*ev))
+  summarise(dem_ev = sum((pct_obama>0.5)*ev))
 
 # final EV distribution
 final_evs <- draws %>%
   left_join(states2008 %>% select(state,ev),by='state') %>%
   filter(t==max(t)) %>%
   group_by(draw) %>%
-  summarise(dem_ev = sum(ev* (p_obama > 0.5)))
+  summarise(dem_ev = sum(ev* (pct_obama > 0.5)))
 
 
 grid.arrange(
