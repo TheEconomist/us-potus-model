@@ -32,6 +32,7 @@ cov_matrix <- function(n, sigma2, rho){
     diag(m) <- 1
     (sigma2^.5 * diag(n))  %*% m %*% (sigma2^.5 * diag(n))
 }
+
 mean_low_high <- function(draws, states, id){
   tmp <- draws
   draws_df <- data.frame(mean = inv.logit(apply(tmp, MARGIN = 2, mean)),
@@ -136,6 +137,37 @@ all_t <- min(df$t) + days(0:(ndays))
 all_t_until_election <- min(all_t) + days(0:(election_day - min(all_t)))
 # pollster indices
 all_pollsters <- levels(as.factor(as.character(df$pollster)))
+
+
+# getting state contextual information from 2012 -------------------------
+states2012 <- read.csv("data/2012.csv", 
+                       header = TRUE, stringsAsFactors = FALSE) %>% 
+  mutate(score = obama_count / (obama_count + romney_count),
+         national_score = sum(obama_count)/sum(obama_count + romney_count),
+         delta = score - national_score,
+         share_national_vote = (total_count*(1+adult_pop_growth_2011_15))
+         /sum(total_count*(1+adult_pop_growth_2011_15))) %>%
+  arrange(state) 
+
+state_abb <- states2012$state
+rownames(states2012) <- state_abb
+
+# get state indices
+all_states <- states2012$state
+state_name <- states2012$state_name
+names(state_name) <- state_abb
+
+# set prior differences
+prior_diff_score <- states2012$delta
+names(prior_diff_score) <- state_abb
+
+# set state weights
+state_weights <- c(states2012$share_national_vote / sum(states2012$share_national_vote))
+names(state_weights) <- state_abb
+
+# electoral votes, by state:
+ev_state <- states2012$ev
+names(ev_state) <- state_abb
 
 
 # create covariance matrices ----------------------------------------------
@@ -251,125 +283,75 @@ newcor %>%
 # this is showing.... how states are correlated with other states??
 #ggplot(state_cor,aes(x=MI, y=PA, label=colnames(state_cor))) + geom_text() + geom_smooth(method='lm')
 
-## get the underlying correlation matrix
-state_correlation <- cor(state_cor)  
+# save the diaganol elements from the cov matrix
+s_diag_elements_cov_matrix = sqrt(diag(cov(state_cor)))
 
-# function to find covariance coefficient for a given standard deviation
-find_sigma2_value <- function(empirical_sd){
-  gen_residual <- function(par, target_sd){
-    y <- MASS::mvrnorm(100000, rep(0.5,10), Sigma = cov_matrix(10, par^2, 1) ) 
-    error <- mean( inv.logit(apply(y, MARGIN = 2, mean) +  apply(y, MARGIN = 2, sd)) - inv.logit(apply(y, MARGIN = 2, mean)) ) - target_sd
-    return(abs(error))
-  }
-  optimize(f = gen_residual, interval = c(0.00001,5),target_sd = empirical_sd,tol = 0.00001)
-}
+# initial correlation matrix
+state_correlation =  cov(state_cor) * outer(1/s_diag_elements_cov_matrix, 1/s_diag_elements_cov_matrix)
 
-# checking the amounts of error in the correlation matrices
-y <- MASS::mvrnorm(100000, rep(0.5,10), Sigma = cov_matrix(10, find_sigma2_value(empirical_sd = 0.05)$minimum^2, 1) ) 
-mean( inv.logit(apply(y, MARGIN = 2, mean) +  apply(y, MARGIN = 2, sd)) - inv.logit(apply(y, MARGIN = 2, mean)) ) 
+# transformed correlation matrix
+state_correlation <- pmax(state_correlation,0.3) # baseline cor from national error
 
-# correlation & covariance matrix for polling error
-state_correlation[state_correlation < 0.3] <- 0.3 # baseline cor from national error
-state_correlation <- make.positive.definite(state_correlation)
-
-# correlation & covariance matrix for the e-day prior
-state_correlation[state_correlation < 0.3] <- 0.3 # baseline cor from national error
-state_correlation <- make.positive.definite(state_correlation)
-
-# correlation & covariance matrix for random walk
-state_correlation[state_correlation < 0.3] <- 0.3 # baseline cor from national error
-state_correlation <- make.positive.definite(state_correlation)
-
-# covariance for polling error
-state_correlation_error <- cov_matrix(51, find_sigma2_value(empirical_sd = 0.025)$minimum^2, 0.9) # 3.4% on elec day
-state_correlation_error <- state_correlation_error * state_correlation
-
-
----- to put above ---- 
-  
-  
-# covariance for prior e-day prediction
-target_se = read_csv("data/state_priors_08_12_16.csv") %>%
+# generate baseline covariance matrix
+# using standard errors from the prior model
+target_se <- read_csv("data/state_priors_08_12_16.csv") %>%
   filter(date <= RUN_DATE) %>%
   group_by(state) %>%
   arrange(date) %>%
   filter(date == max(date)) %>%
+  select(state,se) %>%
+  ungroup() %>%
+  arrange(state) %>% 
   pull(se)
 
-state_correlation_mu_b_T <- cov_matrix(n = 51, sigma2 = find_sigma2_value(empirical_sd = median(target_se))$minimum^2, rho = 0.9) # 6% on elec day
-state_correlation_mu_b_T <- state_correlation_mu_b_T * state_correlation
+state_covariance <- state_correlation * outer(4*target_se,4*target_se) # s_diag_elements_cov_matrix)
+state_covariance <- make.positive.definite(state_covariance)
 
-new_diag <- pbsapply(target_se, cl=parallel::detectCores()-1, function(x){find_sigma2_value(empirical_sd = x)$minimum})^2
-diag(state_correlation_mu_b_T) <- ifelse(new_diag > diag(state_correlation_mu_b_T), new_diag, diag(state_correlation_mu_b_T))
+sqrt(diag(state_covariance)) / 4
 
-# covariance matrix for random walks
-state_correlation_mu_b_walk <- cov_matrix(51, (0.012)^2, 0.9) 
-state_correlation_mu_b_walk <- state_correlation_mu_b_walk * state_correlation
+sqrt(t(state_weights) %*% state_covariance %*% state_weights) / 4
 
-# how much error is this?
-round(100*sqrt(as.numeric(300)) * sd(inv.logit(rnorm(1e5, 0, sqrt(state_correlation_mu_b_walk[1,1]))))*1.96, 1)
+# get sd to pass to stan
+national_cov_matrix_error_sd
 
+national_cov_matrix_error_sd <- sqrt(t(state_weights) %*% state_covariance %*% state_weights) %>% as.numeric()
 
---- end re-write ---
-  
-  
-# getting state contextual information from 2012 -------------------------
-states2012 <- read.csv("data/2012.csv", 
-                       header = TRUE, stringsAsFactors = FALSE) %>% 
-  mutate(score = obama_count / (obama_count + romney_count),
-         national_score = sum(obama_count)/sum(obama_count + romney_count),
-         delta = score - national_score,
-         share_national_vote = (total_count*(1+adult_pop_growth_2011_15))
-         /sum(total_count*(1+adult_pop_growth_2011_15))) %>%
-  arrange(state) 
+# example of how the transformation works
+polling_cov_matrix <- state_covariance * (0.06/national_cov_matrix_error_sd)^2
 
-state_abb <- states2012$state
-rownames(states2012) <- state_abb
-
-# get state indices
-all_states <- states2012$state
-state_name <- states2012$state_name
-names(state_name) <- state_abb
-
-# set prior differences
-prior_diff_score <- states2012$delta
-names(prior_diff_score) <- state_abb
-
-# set state weights
-state_weights <- c(states2012$share_national_vote / sum(states2012$share_national_vote))
-names(state_weights) <- state_abb
-
-# electoral votes, by state:
-ev_state <- states2012$ev
-names(ev_state) <- state_abb
+sqrt(t(state_weights) %*% polling_cov_matrix %*% state_weights) 
 
 
 # checking parameters -----------------------------------------------------
-# testing that out
-y <- MASS::mvrnorm(10000, rep(0,51), state_correlation_error)
-z <- matrix(state_weights,nrow=10000,ncol=51,byrow = TRUE)
+# what is the sd over the whole matrix?
+# Try this:
+# (x_1,...,x_51) ~ MVN (0, Sigma)
+# w = (w_1,...,w_51), vector of 51 weights that sum to 1 (proportional to expected number of voters in each state)
+# We want sd(w*x) = sd of error in national popular vote
+# w*x is the dot product, w_1*x_1 + ... + x_51*x_51
+# 
+# The formula, I think, is var(w*x) = t(w) * Sigma * w
+# where w is the column vector and t(w) = transpose(w) is the row vector.
+# And sd(w*x) = sqrt(var(w*x))
 
-# avg sd across states
-apply(inv.logit(y), 2, sd) %>% mean
-
-# national average and standard deviation
-national_average <- apply(inv.logit(y) * z, 1, sum)
-mean(national_average)
-sd(national_average)
 
 # errs since 1968
 err <- c(0.5,1.9,0.8,7.2,1.0,1.4,0.1,3.3,3.4,0.9,0.3,2.7,1) / 2 
 sqrt(mean(err^2))
 
-# extra model specification error
-hist(rnorm(10000) * 2.5, breaks = 100)
-hist(rt(10000,4) * 3.2, breaks = 100)
-hist(rt(10000,7) * 3.2, breaks = 100)
+# # polling error
+# sqrt(t(state_weights) %*% state_correlation_error %*% state_weights) / 4
+# 
+# # random walk
+# sqrt(t(state_weights) %*% state_covariance %*% state_weights) / 4
+# 
+# # prior
+# sqrt(t(state_weights) %*% state_correlation_mu_b_T %*% state_weights) / 4
 
 # random walks
 plot(cumsum(rnorm(300)*0.5), type="l")
 plot(cumsum(rt(300,7)*0.5), type="l")
-sqrt(300) * (inv.logit(0.02)-0.5)
+sqrt(300) * (inv.logit(0.023)-0.5)
 replicate(10000, cumsum(rnorm(300)*0.5)[300]) %>% sd
 
 
@@ -399,13 +381,17 @@ prior_in <- read_csv("data/state_priors_08_12_16.csv") %>%
   ungroup() %>%
   arrange(state)
 
+# error in the national prior
+national_prior_sd <- read_csv('data/historical_predicted_national_vote.csv') %>%
+  filter(date == RUN_DATE) %>%
+  pull(polls_plus_fundamentals_error)
+
 mu_b_prior <- logit(prior_in$pred )
 names(mu_b_prior) <- prior_in$state
 names(mu_b_prior) == names(prior_diff_score) # correct order?
 national_mu_prior <- weighted.mean(inv.logit(mu_b_prior), state_weights)
-cat(sprintf('Prior Clinton two-party vote is %s\nWith a standard error of %s',
+cat(sprintf('Prior Clinton two-party vote is %s\nWith a avg state sd of %s',
             round(national_mu_prior,3),round(median(target_se),3)))
-
 
 # alpha for disconnect in state v national polls 
 score_among_polled <- sum(states2012[all_polled_states[-1],]$obama_count)/
@@ -427,8 +413,8 @@ df %>% filter((pollster %in% adjusters)) %>% pull(pollster) %>% unique()
 
 
 # Passing data to Stan ----------------------------------------------------
-N_state <- nrow(df %>% filter(index_s != 52))
-N_national <- nrow(df %>% filter(index_s == 52))
+N_state_polls <- nrow(df %>% filter(index_s != 52))
+N_national_polls <- nrow(df %>% filter(index_s == 52))
 T <- as.integer(round(difftime(election_day, first_day)))
 current_T <- max(df$poll_day)
 S <- 51
@@ -452,9 +438,8 @@ n_two_share_national <- df %>% filter(index_s == 52) %>% transmute(n_two_share =
 n_two_share_state <- df %>% filter(index_s != 52) %>% transmute(n_two_share = n_trump + n_clinton) %>% pull(n_two_share)
 unadjusted_national <- df %>% mutate(unadjusted = ifelse(!(pollster %in% adjusters), 1, 0)) %>% filter(index_s == 52) %>% pull(unadjusted)
 unadjusted_state <- df %>% mutate(unadjusted = ifelse(!(pollster %in% adjusters), 1, 0)) %>% filter(index_s != 52) %>% pull(unadjusted)
-
-                                   
-# priors
+                        
+# priors (on the logit scale)
 sigma_measure_noise_national <- 0.06
 sigma_measure_noise_state <- 0.06
 sigma_a <- 0.02
@@ -462,11 +447,15 @@ sigma_c <- 0.06
 sigma_m <- 0.04
 sigma_pop <- 0.04
 sigma_e_bias <- 0.02
+polling_bias_scale <- 0.06 # equal to a point and a half of national polling error
+# thise line canceled passed in as a default: forecast_error_scale <- 0.08 # the sd of the national prior today
+random_walk_scale <- 0.01
+national_cov_matrix_error_sd <- national_cov_matrix_error_sd # declared earlier
 
 # list of data for export
 data <- list(
-  N_national = N_national,
-  N_state = N_state,
+  N_national_polls = N_national_polls,
+  N_state_polls = N_state_polls,
   T = T,
   S = S,
   P = P,
@@ -489,9 +478,9 @@ data <- list(
   unadjusted_national = unadjusted_national,
   unadjusted_state = unadjusted_state,
   current_T = as.integer(current_T),
-  ss_cov_mu_b_T = state_correlation_mu_b_T,
-  ss_cov_mu_b_walk = state_correlation_mu_b_walk,
-  ss_cov_error = state_correlation_error,
+  state_covariance = state_covariance,
+  polling_bias_scale = polling_bias_scale,
+  random_walk_scale = random_walk_scale,
   sigma_a = sigma_a,
   sigma_measure_noise_national = sigma_measure_noise_national,
   sigma_measure_noise_state = sigma_measure_noise_state,
@@ -499,7 +488,8 @@ data <- list(
   sigma_c = sigma_c,
   sigma_m = sigma_m,
   sigma_pop = sigma_pop,
-  sigma_e_bias = sigma_e_bias
+  sigma_e_bias = sigma_e_bias,
+  national_cov_matrix_error_sd = national_cov_matrix_error_sd
 )
 
 
@@ -522,7 +512,7 @@ out <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
 
 ## --- priors
 ## mu_b_T
-y <- MASS::mvrnorm(1000, mu_b_prior, Sigma = state_correlation_mu_b_T)
+y <- MASS::mvrnorm(1000, mu_b_prior, Sigma = state_covariance)
 mu_b_T_posterior_draw <- rstan::extract(out, pars = "mu_b")[[1]][,,254]
 mu_b_T_prior_draws     <- mean_low_high(y, states = colnames(y), id = "prior")
 mu_b_T_posterior_draws <- mean_low_high(mu_b_T_posterior_draw, states = colnames(y), id = "posterior")
@@ -614,16 +604,16 @@ mu_pop_plt <- mu_pop_draws %>% arrange(mean) %>%
   theme_bw()
 mu_pop_plt
 ## state error terms
-polling_error_posterior <- rstan::extract(out, pars = "polling_error")[[1]]
+polling_error_posterior <- rstan::extract(out, pars = "polling_bias")[[1]]
 polling_error_posterior_draws <- data.frame(draws = as.vector(polling_error_posterior),
                                    index_s = sort(rep(seq(1, S), dim(polling_error_posterior)[1])), 
                                    type = "posterior")
-y <- MASS::mvrnorm(1000, rep(0, S), Sigma = state_correlation_error)
+y <- MASS::mvrnorm(1000, rep(0, S), Sigma = state_covariance * sqrt(0.02/polling_bias_scale))
 polling_error_prior_draws <- data.frame(draws = as.vector(y),
                                    index_s = sort(rep(seq(1, S), dim(y)[1])), 
                                     type = "prior")
 polling_error_draws <- rbind(polling_error_posterior_draws, polling_error_prior_draws) 
-states <- data.frame(index_s = 1:51, states = rownames(state_correlation_error))
+states <- data.frame(index_s = 1:51, states = rownames(state_correlation))
 polling_error_draws <- merge(polling_error_draws, states, by = "index_s", all.x = TRUE)
 polling_error_draws <- polling_error_draws %>%
   group_by(states, type) %>%
