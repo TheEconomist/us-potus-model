@@ -21,33 +21,27 @@ data{
   int n_two_share_state[N_state_polls];
   vector<lower = 0, upper = 1.0>[N_national_polls] unadjusted_national;
   vector<lower = 0, upper = 1.0>[N_state_polls] unadjusted_state;
-  int<lower = 1, upper = T> current_T;
-  cov_matrix[S] state_covariance;
+  cov_matrix[S] ss_cov_mu_b_walk;
+  cov_matrix[S] ss_cov_mu_b_T;
+  cov_matrix[S] ss_cov_poll_bias;
   //*** prior input
   vector[S] mu_b_prior; 
   vector[S] state_weights;
-  real sigma_a;
+  //real sigma_a;
   real sigma_c;
   real sigma_m;
   real sigma_pop;
   real sigma_measure_noise_national;
   real sigma_measure_noise_state;
   real sigma_e_bias;
-  real random_walk_scale;
-  real polling_bias_scale;
-  real national_cov_matrix_error_sd;
 }
 transformed data {
   cholesky_factor_cov[S] cholesky_ss_cov_mu_b_T;
   cholesky_factor_cov[S] cholesky_ss_cov_mu_b_walk;
-  cholesky_factor_cov[S] cholesky_ss_cov_error;
-  // scale covariance
-  matrix[S, S] ss_cov_error = state_covariance * square(polling_bias_scale/national_cov_matrix_error_sd);
-  matrix[S, S] ss_cov_mu_b_walk = state_covariance * square(random_walk_scale/national_cov_matrix_error_sd);
-// transformation
-  cholesky_ss_cov_mu_b_T = cholesky_decompose(state_covariance);
+  cholesky_factor_cov[S] cholesky_ss_cov_poll_bias;
+  cholesky_ss_cov_mu_b_T = cholesky_decompose(ss_cov_mu_b_T);
   cholesky_ss_cov_mu_b_walk = cholesky_decompose(ss_cov_mu_b_walk);
-  cholesky_ss_cov_error = cholesky_decompose(ss_cov_error);
+  cholesky_ss_cov_poll_bias = cholesky_decompose(ss_cov_poll_bias);
 }
 parameters {
   //real raw_mu_a[T];
@@ -56,9 +50,9 @@ parameters {
   vector[P] raw_mu_c;
   vector[M] raw_mu_m;
   vector[Pop] raw_mu_pop;
-  real<offset=0, multiplier=0.06> mu_e_bias;
+  real<offset=0, multiplier=0.02> mu_e_bias;
   real<lower = 0, upper = 1> rho_e_bias;
-  vector[current_T] raw_e_bias;
+  vector[T] raw_e_bias;
   vector[N_national_polls] raw_measure_noise_national;
   vector[N_state_polls] raw_measure_noise_state;
   vector[S] raw_polling_bias; 
@@ -71,8 +65,8 @@ transformed parameters {
   vector[P] mu_c;
   vector[M] mu_m;
   vector[Pop] mu_pop;
-  vector[current_T] e_bias;
-  vector[S] polling_bias = cholesky_ss_cov_error * raw_polling_bias;
+  vector[T] e_bias;
+  vector[S] polling_bias = cholesky_ss_cov_poll_bias * raw_polling_bias;
   vector[T] national_mu_b_average;
   real national_polling_bias_average = transpose(polling_bias) * state_weights;
   real sigma_rho;
@@ -80,11 +74,8 @@ transformed parameters {
   vector[N_state_polls] logit_pi_democrat_state;
   vector[N_national_polls] logit_pi_democrat_national;
   //*** construct parameters
-  //mu_a[T] = 0;
+  //mu_a[T] = 0; 
   //for (i in 1:(T-1)) mu_a[T - i] = raw_mu_a[T - i] * sigma_a + mu_a[T + 1 - i];
-  //mu_a[current_T] = 0;
-  //for (t in 1:(current_T - 1)) mu_a[current_T - t] = mu_a[current_T - t + 1] + raw_mu_a[current_T - t + 1] * sigma_a; 
-  //for(i in 1:T) mu_a[i] = 0; // What if we take out mu_a?
   mu_b[:,T] = cholesky_ss_cov_mu_b_T * raw_mu_b_T * mu_b_T_model_estimation_error + mu_b_prior;
   for (i in 1:(T-1)) mu_b[:, T - i] = cholesky_ss_cov_mu_b_walk * raw_mu_b[:, T - i] + mu_b[:, T + 1 - i];
   national_mu_b_average = transpose(mu_b) * state_weights;
@@ -93,7 +84,7 @@ transformed parameters {
   mu_pop = raw_mu_pop * sigma_pop;
   e_bias[1] = raw_e_bias[1] * sigma_e_bias;
   sigma_rho = sqrt(1-square(rho_e_bias)) * sigma_e_bias;
-  for (t in 2:current_T) e_bias[t] = mu_e_bias + rho_e_bias * (e_bias[t - 1] - mu_e_bias) + raw_e_bias[t] * sigma_rho;
+  for (t in 2:T) e_bias[t] = mu_e_bias + rho_e_bias * (e_bias[t - 1] - mu_e_bias) + raw_e_bias[t] * sigma_rho;
   //*** fill pi_democrat
   for (i in 1:N_state_polls){
     logit_pi_democrat_state[i] = 
@@ -137,10 +128,10 @@ model {
   n_democrat_national ~ binomial_logit(n_two_share_national, logit_pi_democrat_national);
 }
 
-
 generated quantities {
   matrix[T, S] predicted_score;
   for (s in 1:S){
+    //predicted_score[1:T, s] = inv_logit(mu_a[1:T] + to_vector(mu_b[s, 1:T]));
     predicted_score[1:T, s] = inv_logit(to_vector(mu_b[s, 1:T]));
-    }
+  }
 }
