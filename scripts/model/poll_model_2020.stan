@@ -50,7 +50,7 @@ transformed data {
   cholesky_ss_cov_error = cholesky_decompose(ss_cov_error);
 }
 parameters {
-  real raw_mu_a[T];
+  //real raw_mu_a[T];
   vector[S] raw_mu_b_T;
   matrix[S, T] raw_mu_b; 
   vector[P] raw_mu_c;
@@ -66,7 +66,7 @@ parameters {
 }
 transformed parameters {
   //*** parameters
-  vector[T] mu_a;
+  //vector[T] mu_a;
   matrix[S, T] mu_b;
   vector[P] mu_c;
   vector[M] mu_m;
@@ -84,7 +84,7 @@ transformed parameters {
   //for (i in 1:(T-1)) mu_a[T - i] = raw_mu_a[T - i] * sigma_a + mu_a[T + 1 - i];
   //mu_a[current_T] = 0;
   //for (t in 1:(current_T - 1)) mu_a[current_T - t] = mu_a[current_T - t + 1] + raw_mu_a[current_T - t + 1] * sigma_a; 
-  for(i in 1:T) mu_a[i] = 0; // What if we take out mu_a?
+  //for(i in 1:T) mu_a[i] = 0; // What if we take out mu_a?
   mu_b[:,T] = cholesky_ss_cov_mu_b_T * raw_mu_b_T * mu_b_T_model_estimation_error + mu_b_prior;
   for (i in 1:(T-1)) mu_b[:, T - i] = cholesky_ss_cov_mu_b_walk * raw_mu_b[:, T - i] + mu_b[:, T + 1 - i];
   national_mu_b_average = transpose(mu_b) * state_weights;
@@ -97,7 +97,7 @@ transformed parameters {
   //*** fill pi_democrat
   for (i in 1:N_state_polls){
     logit_pi_democrat_state[i] = 
-      mu_a[day_state[i]] + 
+      //mu_a[day_state[i]] + 
       mu_b[state[i], day_state[i]] + 
       mu_c[poll_state[i]] + 
       mu_m[poll_mode_state[i]] + 
@@ -107,7 +107,7 @@ transformed parameters {
       polling_bias[state[i]];
   }
   logit_pi_democrat_national = 
-    mu_a[day_national] + 
+    //mu_a[day_national] + 
     national_mu_b_average[day_national] +  
     mu_c[poll_national] + 
     mu_m[poll_mode_national] + 
@@ -119,7 +119,7 @@ transformed parameters {
 
 model {
   //*** priors
-  raw_mu_a ~ std_normal();
+  //raw_mu_a ~ std_normal();
   raw_mu_b_T ~ std_normal();
   mu_b_T_model_estimation_error ~ scaled_inv_chi_square(7, 1);
   to_vector(raw_mu_b) ~ std_normal();
@@ -136,6 +136,7 @@ model {
   n_democrat_state ~ binomial_logit(n_two_share_state, logit_pi_democrat_state);
   n_democrat_national ~ binomial_logit(n_two_share_national, logit_pi_democrat_national);
 }
+
 
 generated quantities {
   matrix[T, S] predicted_score;
