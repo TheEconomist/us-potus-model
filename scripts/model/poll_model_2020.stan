@@ -21,9 +21,9 @@ data{
   int n_two_share_state[N_state_polls];
   vector<lower = 0, upper = 1.0>[N_national_polls] unadjusted_national;
   vector<lower = 0, upper = 1.0>[N_state_polls] unadjusted_state;
-  cov_matrix[S] ss_cov_mu_b_walk;
-  cov_matrix[S] ss_cov_mu_b_T;
-  cov_matrix[S] ss_cov_poll_bias;
+  //cov_matrix[S] ss_cov_mu_b_walk;
+  //cov_matrix[S] ss_cov_mu_b_T;
+  //cov_matrix[S] ss_cov_poll_bias;
   //*** prior input
   vector[S] mu_b_prior; 
   vector[S] state_weights;
@@ -34,14 +34,25 @@ data{
   real sigma_measure_noise_national;
   real sigma_measure_noise_state;
   real sigma_e_bias;
+  // covariance matrix and scales
+  cov_matrix[S] state_covariance_0;
+  real random_walk_scale;
+  real mu_b_T_scale;
+  real polling_bias_scale;
 }
 transformed data {
+  real national_cov_matrix_error_sd = sqrt(transpose(state_weights) * state_covariance_0 * state_weights);
   cholesky_factor_cov[S] cholesky_ss_cov_mu_b_T;
   cholesky_factor_cov[S] cholesky_ss_cov_mu_b_walk;
   cholesky_factor_cov[S] cholesky_ss_cov_poll_bias;
+  // scale covariance
+  matrix[S, S] ss_cov_poll_bias = state_covariance_0 * square(polling_bias_scale/national_cov_matrix_error_sd);
+  matrix[S, S] ss_cov_mu_b_T = state_covariance_0 * square(mu_b_T_scale/national_cov_matrix_error_sd);
+  matrix[S, S] ss_cov_mu_b_walk = state_covariance_0 * square(random_walk_scale/national_cov_matrix_error_sd);
+// transformation
+  cholesky_ss_cov_poll_bias = cholesky_decompose(ss_cov_poll_bias);
   cholesky_ss_cov_mu_b_T = cholesky_decompose(ss_cov_mu_b_T);
   cholesky_ss_cov_mu_b_walk = cholesky_decompose(ss_cov_mu_b_walk);
-  cholesky_ss_cov_poll_bias = cholesky_decompose(ss_cov_poll_bias);
 }
 parameters {
   //real raw_mu_a[T];
@@ -135,3 +146,4 @@ generated quantities {
     predicted_score[1:T, s] = inv_logit(to_vector(mu_b[s, 1:T]));
   }
 }
+
