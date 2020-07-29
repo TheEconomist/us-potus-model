@@ -2,13 +2,13 @@
 # Refactored version run file
 
 ## Setup
-rm(list = ls())
+#rm(list = ls())
 options(mc.cores = 4)
 n_chains <- 4
 n_cores <- 4
-n_sampling <- 250
-n_warmup <- 250
-n_refresh <- 25
+n_sampling <- 500
+n_warmup <- 500
+n_refresh <- 50
 
 ## Libraries
 {
@@ -104,7 +104,7 @@ df <- df %>%
          pct_clinton = clinton/two_party_sum,
          n_trump = round(n * trump/100),
          pct_trump = trump/two_party_sum)
-first_day <- min(df$start.date)
+
 
 ## --- numerical indices
 state_abb_list <- read.csv("data/potus_results_76_16.csv") %>%
@@ -131,8 +131,11 @@ df <- df %>%
     pct_trump, n_trump, 
     poll_day, index_s, index_p, index_m, index_pop, index_t)
 
+# useful vectors
 all_polled_states <- df$state %>% unique %>% sort
+
 # day indices
+first_day <- min(df$start.date)
 ndays <- max(df$t) - min(df$t)
 all_t <- min(df$t) + days(0:(ndays))
 all_t_until_election <- min(all_t) + days(0:(election_day - min(all_t)))
@@ -286,7 +289,7 @@ state_correlation_model <- newcor
 state_correlation_model[state_correlation_model < 0.5] <- 0.5 # baseline cor from national model error
 state_correlation_model <- make.positive.definite(state_correlation_model)
 
-# OLD METHOD FOR COV MATs
+## OLD METHOD FOR COV MATs ##
 # function to find covariance coefficient for a given standard deviation, test it
 find_sigma2_value <- function(empirical_sd){
   gen_residual <- function(par, target_sd){
@@ -301,7 +304,7 @@ y <- MASS::mvrnorm(100000, rep(0.5,10), Sigma = cov_matrix(10, find_sigma2_value
 mean( inv.logit(apply(y, MARGIN = 2, mean) +  apply(y, MARGIN = 2, sd)) - inv.logit(apply(y, MARGIN = 2, mean)) )
 
 # covariance matrix for polling error
-state_covariance_polling_bias <- cov_matrix(51, find_sigma2_value(empirical_sd = 0.025)$minimum^2, 0.9) # 3.4% on elec day
+state_covariance_polling_bias <- cov_matrix(51, find_sigma2_value(empirical_sd = 0.02)$minimum^2, 0.9) # 3.4% on elec day
 state_covariance_polling_bias <- state_covariance_polling_bias * state_correlation_polling
 
 # covariance for prior e-day prediction
@@ -311,6 +314,8 @@ target_se = read_csv("data/state_priors_08_12_16.csv") %>%
   arrange(date) %>%
   filter(date == max(date)) %>%
   pull(se)
+target_se <- pmax(target_se,0.03) # force minimum SD on a state vote share to be 0.03
+
 
 state_covariance_mu_b_T <- cov_matrix(n = 51, sigma2 = find_sigma2_value(empirical_sd = median(target_se))$minimum^2, rho = 0.9) # 6% on elec day
 state_covariance_mu_b_T <- state_covariance_mu_b_T * state_correlation_polling
@@ -325,7 +330,7 @@ state_covariance_mu_b_walk <- state_covariance_mu_b_walk * state_correlation_pol
 (sqrt(t(state_weights) %*% state_covariance_mu_b_walk %*% state_weights) / 4) * sqrt(300)
 
 
-# NEW METHOD FOR DOING COVARIANCE MATRICES ---------
+## NEW METHOD FOR COV MATS ##
 # we're going to make one covariance matrix here and pass it
 # and 3 scaling values to stan, where the 3 values are 
 # (1) the national sd on the polls, (2) the national sd
@@ -343,7 +348,7 @@ sqrt(t(state_weights) %*% state_covariance_0 %*% state_weights) / 4
 national_cov_matrix_error_sd <- sqrt(t(state_weights) %*% state_covariance_0 %*% state_weights) %>% as.numeric()
 national_cov_matrix_error_sd
 
-# the 3 values are defined below
+# the 3 values are defined in the data section
 
 
 # checking parameters -----------------------------------------------------
@@ -372,6 +377,12 @@ check_cov_matrix(state_covariance_polling_bias)
 check_cov_matrix(state_covariance_mu_b_T)
 check_cov_matrix(state_covariance_mu_b_walk)
 
+# poll bias should be:
+err <- c(0.5, 1.9, 0.8, 7.2, 1.0, 1.4, 0.1, 3.3, 3.4, 0.9, 0.3, 2.7, 1.0) / 2 
+sqrt(mean(err^2))
+# save the scales for later
+polling_bias_scale <- sqrt(t(state_weights) %*% state_covariance_polling_bias %*% state_weights) / 4
+mu_b_T_scale <- sqrt(t(state_weights) %*% state_covariance_mu_b_T %*% state_weights) / 4
 
 # implied national posterior on e-day
 1 / sqrt( 1/((sqrt(t(state_weights) %*% state_covariance_polling_bias %*% state_weights) / 4)^2) + 
@@ -399,7 +410,7 @@ sqrt(300) * (inv.logit(0.024)-0.5)
 replicate(10000, cumsum(rnorm(300)*0.6)[300]) %>% sd
 
 
-# Create priors -----------------------------------------------------------
+# create priors -----------------------------------------------------------
 # read in abramowitz data
 abramowitz <- read.csv('data/abramowitz_data.csv') %>% filter(year < 2016)
 prior_model <- lm(incvote ~  juneapp + q2gdp, data = abramowitz)
@@ -446,7 +457,7 @@ adjusters <- c(
 df %>% filter((pollster %in% adjusters)) %>% pull(pollster) %>% unique()
 
 
-# Passing data to Stan ----------------------------------------------------
+# passing data to Stan ----------------------------------------------------
 N_state_polls <- nrow(df %>% filter(index_s != 52))
 N_national_polls <- nrow(df %>% filter(index_s == 52))
 T <- as.integer(round(difftime(election_day, first_day)))
@@ -482,8 +493,9 @@ sigma_m <- 0.04
 sigma_pop <- 0.04
 sigma_e_bias <- 0.02
 
-polling_bias_scale <- 0.0165 * 4
-mu_b_T_scale <- 0.0281 * 4
+
+polling_bias_scale <- as.numeric(polling_bias_scale) * 4
+mu_b_T_scale <- as.numeric(mu_b_T_scale) * 4
 random_walk_scale <- (0.05/sqrt(300)) * 4
 
 # put the data in a list to export to Stan
@@ -531,7 +543,7 @@ data <- list(
 )
 
 
-# Run the Stan model ------------------------------------------------------
+# run the Stan model ------------------------------------------------------
 message("Running model...")
 # model options
 #("scripts/model/poll_model_2020_no_partisan_correction.stan")
@@ -564,7 +576,7 @@ gc()
 # save model for today
 write_rds(out, sprintf('models/stan_model_%s.rds',RUN_DATE),compress = 'gz')
 
-### Extract results ----
+# extracting results ----
 out <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
 
 ## --- priors
@@ -738,8 +750,8 @@ pct_clinton <- pblapply(1:dim(predicted_score)[3],
                       temp <- predicted_score[,,x]
                       
                       # put in tibble
-                      tibble(low = apply(temp,2,function(x){(quantile(x,0.05))}),
-                             high = apply(temp,2,function(x){(quantile(x,0.95))}),
+                      tibble(low = apply(temp,2,function(x){(quantile(x,0.025))}),
+                             high = apply(temp,2,function(x){(quantile(x,0.975))}),
                              mean = apply(temp,2,function(x){(mean(x))}),
                              prob = apply(temp,2,function(x){(mean(x>0.5))}),
                              state = x) 
@@ -816,11 +828,13 @@ sim_evs <- draws %>%
   summarise(dem_ev = sum(ev * (pct_clinton > 0.5))) %>%
   group_by(t) %>%
   summarise(mean_dem_ev = mean(dem_ev),
+            median_dem_ev = median(dem_ev),
             high_dem_ev = quantile(dem_ev,0.975),
             low_dem_ev = quantile(dem_ev,0.025),
             prob = mean(dem_ev >= 270))
 
 identifier <- paste0(Sys.Date()," || " , out@model_name)
+
 natl_polls.gg <- pct_clinton %>%
   filter(state == '--') %>%
   left_join(df %>% select(state,t,pct_clinton,method)) %>% # plot over time
@@ -836,23 +850,30 @@ natl_polls.gg <- pct_clinton %>%
   theme(legend.position = 'none') +
   scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b') +
   scale_y_continuous(breaks=seq(0,1,0.02)) + 
-  labs(subtitle='pct_clinton national')
+  labs(subtitletitle=sprintf('clinton natl pct | mean = %s | p(win) = %s',
+                             round(pct_clinton[pct_clinton$state=='--' & pct_clinton$t==election_day,]$mean*100,1),
+                             round(pct_clinton[pct_clinton$state=='--' & pct_clinton$t==election_day,]$prob,2)))
 
 natl_evs.gg <-  ggplot(sim_evs, aes(x=t)) +
   geom_hline(yintercept = 270) +
-  geom_line(aes(y=mean_dem_ev)) +
+  geom_line(aes(y=median_dem_ev)) +
   geom_ribbon(aes(ymin=low_dem_ev,ymax=high_dem_ev),alpha=0.2) +
   theme_minimal()  +
   theme(legend.position = 'none') +
   scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b') +
-  labs(subtitletitle='clinton evs')
+  labs(subtitletitle=sprintf('clinton evs | median = %s | p(win) = %s',
+                             round(sim_evs[sim_evs$t==election_day,]$median_dem_ev),
+                             round(sim_evs[sim_evs$t==election_day,]$prob,2)))
 
 state_polls.gg <- pct_clinton %>%
   filter(state %in% ex_states) %>%
-  left_join(df %>% select(state,t,pct_clinton,method)) %>% # plot over time
+  left_join(df %>% select(state,t,pct_clinton,method)) %>% 
+  left_join(tibble(state = names(mu_b_prior),
+                   prior = inv.logit(mu_b_prior)) ) %>%
   ggplot(.,aes(x=t,col=state)) +
   geom_ribbon(aes(ymin=low,ymax=high),col=NA,alpha=0.2) +
   geom_hline(yintercept = 0.5) +
+  geom_hline(aes(yintercept = prior),linetype=2) +
   geom_point(aes(y=pct_clinton,shape=method),alpha=0.3) +
   geom_line(aes(y=mean)) +
   facet_wrap(~state) +
@@ -861,6 +882,7 @@ state_polls.gg <- pct_clinton %>%
   guides(color='none') +
   scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b') +
   labs(subtitle='pct_clinton state')
+
 
 grid.arrange(natl_polls.gg, natl_evs.gg, state_polls.gg, 
              layout_matrix = rbind(c(1,1,3,3,3),
@@ -996,5 +1018,4 @@ tibble(outlet = c('538 polls-plus','538 polls-only','princeton','nyt upshot','kr
                    unwtd_brier = mean(compare$diff),
                    states_correct=sum(round(compare$clinton_win) == round(compare$clinton_win_actual)))) %>%
   arrange(ev_wtd_brier) 
-
 
