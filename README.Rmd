@@ -43,9 +43,6 @@ library(pbapply)
 library(urbnmapr)
 library(ggrepel)
 library(DT)
-
-# final model version
-# source('scripts/model/final_2016.R');source('scripts/model/final_2012.R');source('scripts/model/final_2008.R');rmarkdown::render('README.Rmd',output_file = 'README.md');beepr::beep(2);
 ```
 
 
@@ -194,9 +191,6 @@ national_mu_prior <- 0.566
 # Mean of the mu_b_prior
 mu_b_prior <- logit(national_mu_prior + prior_diff_score)
 
-# etc
-a <- rstan::extract(out, pars = "alpha")[[1]]
-hist(a)
 # sigmas
 tibble(sigma_national = rstan::extract(out, pars = "sigma_a")[[1]],
        sigma_state = rstan::extract(out, pars = "sigma_b")[[1]]) %>%
@@ -692,8 +686,6 @@ national_mu_prior <- 0.502
 mu_b_prior <- logit(national_mu_prior + prior_diff_score)
 
 # etc
-a <- rstan::extract(out, pars = "alpha")[[1]]
-hist(a)
 # sigmas
 tibble(sigma_national = rstan::extract(out, pars = "sigma_a")[[1]],
        sigma_state = rstan::extract(out, pars = "sigma_b")[[1]]) %>%
@@ -1201,7 +1193,6 @@ national_mu_prior <- 0.506
 mu_b_prior <- logit(national_mu_prior + prior_diff_score)
 
 # etc
-a <- rstan::extract(out, pars = "alpha")[[1]]
 hist(a)
 # sigmas
 tibble(sigma_national = rstan::extract(out, pars = "sigma_a")[[1]],
