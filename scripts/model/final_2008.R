@@ -866,7 +866,7 @@ pct_obama %>%
                    aes(label=state)) +
   theme_minimal()  +
   theme(legend.position = 'none') +
-  scale_x_date(limits=c(ymd('2012-03-01','2012-11-06')),date_breaks='1 month',date_labels='%b') +
+  scale_x_date(limits=c(ymd('2008-03-01','2008-11-03')),date_breaks='1 month',date_labels='%b') +
   scale_y_continuous(breaks=seq(0,1,0.1)) +
   labs(subtitle = identifier)
 
@@ -887,7 +887,7 @@ pct_obama[pct_obama$state != '--',] %>%
                    aes(label=state)) +
   theme_minimal()  +
   theme(legend.position = 'none') +
-  scale_x_date(limits=c(ymd('2012-03-01','2012-11-06')),date_breaks='1 month',date_labels='%b') +
+  scale_x_date(limits=c(ymd('2008-03-01','2008-11-03')),date_breaks='1 month',date_labels='%b') +
   scale_y_continuous(breaks=seq(-1,1,0.01)) +
   labs(subtitle = identifier)
 

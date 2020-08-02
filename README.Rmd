@@ -23,10 +23,8 @@ In terms of useful files, you should pay attention to the 3 scripts for the 2008
 And there are 3 different Stan scripts that will run different versions of our polling aggregate and election forecasting model:
 
 * `poll_model_2020.stan` - the final model we use for the 2020 presidential election
-* `poll_model_2020_no_partisan_correction.stan` - a model that removes the correction for partisan non-response bias in the polls
-* `poll_model_2020_no_mode_adjustment.stan` - a model that further removes the adjustments for the mode in which a survey is conducted (live phone, online, other) and its population (adult, likely voter, registered voter)
+* `poll_model_2020_no_mode_adjustment.stan` - a model that removes the correction for partisan non-response bias in the polls and the adjustments for the mode in which a survey is conducted (live phone, online, other) and its population (adult, likely voter, registered voter)
 
-The model diagnostics displayed below are all results of the `poll_model_2020.stan` script.
 
 ## Model performance 
 
@@ -185,33 +183,21 @@ names(state_weights) <- c(state_elec_results$state)
 ev_state <- state_elec_results$ev
 names(ev_state) <- state_elec_results$state
 
-# hard code prior
-national_mu_prior <- 0.566
+# read in prior
+prior_in <- read_csv("data/state_priors_08_12_16.csv") %>%
+  filter(date <= RUN_DATE) %>%
+  group_by(state) %>%
+  arrange(date) %>%
+  filter(date == max(date)) %>%
+  select(state,pred) %>%
+  ungroup() %>%
+  arrange(state)
 
-# Mean of the mu_b_prior
-mu_b_prior <- logit(national_mu_prior + prior_diff_score)
+mu_b_prior <- logit(prior_in$pred)
+names(mu_b_prior) <- prior_in$state
+names(mu_b_prior) == names(prior_diff_score) # correct order?
+national_mu_prior <- weighted.mean(inv.logit(mu_b_prior), state_weights)
 
-# sigmas
-tibble(sigma_national = rstan::extract(out, pars = "sigma_a")[[1]],
-       sigma_state = rstan::extract(out, pars = "sigma_b")[[1]]) %>%
-  gather(parameter,value) %>%
-  ggplot(.,aes(x=value)) +
-  geom_histogram(binwidth=0.001) +
-  facet_grid(rows=vars(parameter))
-# measurement noise
-measure_noise_national <- rstan::extract(out, pars = "measure_noise_national")[[1]] * mean(rstan::extract(out, pars = "sigma_measure_noise_national")[[1]])
-hist(measure_noise_national)
-# look at variation in mu_a
-mu_a <- rstan::extract(out, pars = "mu_a")[[1]]
-lapply(1:100,
-       function(x){
-         tibble(mu_a_draw = inv.logit(mu_a[x,]),
-                trial = x) %>%
-           mutate(date = min(df$end) + row_number()) 
-       }) %>%
-  do.call('bind_rows',.) %>%
-  ggplot(.,aes(x=date,y=mu_a_draw,group=trial)) +
-  geom_line(alpha=0.2)
 # extract predictions
 # states
 predicted_score <- rstan::extract(out, pars = "predicted_score")[[1]]
@@ -322,42 +308,44 @@ natl_polls.2008.gg <- pct_obama %>%
   geom_ribbon(aes(ymin=low,ymax=high),col=NA,alpha=0.2) +
   geom_hline(yintercept = 0.5) +
   geom_hline(yintercept = national_mu_prior,linetype=2) +
-  geom_point(aes(y=pct_obama),alpha=0.2) +
-  geom_smooth(aes(y=pct_obama),method='loess',span=0.2,col='black',linetype=2,se=F) +
+  geom_point(aes(y=pct_obama),alpha=0.3) +
   geom_line(aes(y=mean)) +
   facet_wrap(~state) +
   theme_minimal()  +
   theme(legend.position = 'none') +
   scale_x_date(limits=c(ymd('2008-03-01','2008-11-03')),date_breaks='1 month',date_labels='%b') +
-  scale_y_continuous(breaks=seq(0,1,0.02)) +
-  labs(subtitle='pct_obama national')
+  scale_y_continuous(breaks=seq(0,1,0.02)) + 
+  labs(subtitletitle=sprintf('obama natl pct | mean = %s | p(win) = %s',
+                             round(pct_obama[pct_obama$state=='--' & pct_obama$t==election_day,]$mean*100,1),
+                             round(pct_obama[pct_obama$state=='--' & pct_obama$t==election_day,]$prob,2)))
 
 natl_evs.2008.gg <-  ggplot(sim_evs, aes(x=t)) +
   geom_hline(yintercept = 270) +
-  geom_line(aes(y=mean_dem_ev)) +
-  geom_line(aes(y=median_dem_ev),linetype=2) +
+  geom_line(aes(y=median_dem_ev)) +
   geom_ribbon(aes(ymin=low_dem_ev,ymax=high_dem_ev),alpha=0.2) +
   theme_minimal()  +
   theme(legend.position = 'none') +
   scale_x_date(limits=c(ymd('2008-03-01','2008-11-03')),date_breaks='1 month',date_labels='%b') +
-  scale_y_continuous(breaks=seq(0,600,100)) +
-  labs(subtitletitle='obama evs')
+  labs(subtitletitle=sprintf('obama evs | median = %s | p(win) = %s',
+                             round(sim_evs[sim_evs$t==election_day,]$median_dem_ev),
+                             round(sim_evs[sim_evs$t==election_day,]$prob,2)))
 
 state_polls.2008.gg <- pct_obama %>%
   filter(state %in% ex_states) %>%
-  left_join(df %>% select(state,t,pct_obama)) %>% # plot over time
-  # plot
+  left_join(df %>% select(state,t,pct_obama)) %>% 
+  left_join(tibble(state = names(mu_b_prior),
+                   prior = inv.logit(mu_b_prior)) ) %>%
   ggplot(.,aes(x=t,col=state)) +
   geom_ribbon(aes(ymin=low,ymax=high),col=NA,alpha=0.2) +
   geom_hline(yintercept = 0.5) +
-  geom_point(aes(y=pct_obama),alpha=0.2) +
-  #geom_smooth(aes(y=pct_obama,col=state),method='loess',linetype=2,se=F) +
+  geom_hline(aes(yintercept = prior),linetype=2) +
+  geom_point(aes(y=pct_obama),alpha=0.3) +
   geom_line(aes(y=mean)) +
   facet_wrap(~state) +
   theme_minimal()  +
-  theme(legend.position = 'none') +
+  theme(legend.position = 'top') +
+  guides(color='none') +
   scale_x_date(limits=c(ymd('2008-03-01','2008-11-03')),date_breaks='1 month',date_labels='%b') +
-  scale_y_continuous(breaks=seq(0,1,0.05)) +
   labs(subtitle='pct_obama state')
 
 
@@ -493,13 +481,13 @@ final_evs.2008.gg <-  ggplot(final_evs,aes(x=dem_ev,
 map.2008.gg
 ```
 
-#### Final electoral-college histogram
+#### Final electoral college histogram
 
 ```{r echo=F,message=F,warning=F}
 final_evs.2008.gg
 ```
 
-#### National and state polling averages and the electoral college "now-cast" over time
+#### National and state polls and the electoral college over time
 
 ```{r echo=F,message=F,warning=F,fig.width = 9, fig.asp = .62}
 grid.arrange(natl_polls.2008.gg, natl_evs.2008.gg, state_polls.2008.gg, 
@@ -509,7 +497,7 @@ grid.arrange(natl_polls.2008.gg, natl_evs.2008.gg, state_polls.2008.gg,
 )
 ```
 
-#### States' partisan leans over time
+#### State vs national deltas over time
 
 ```{r echo=F,message=F,warning=F}
 state_lean.2008.gg
@@ -543,7 +531,7 @@ pct_obama %>%
          se = round(se,3)) %>%
   select(state,mean,low,high,prob,se) %>%
   arrange(abs(mean-0.5)) %>%
-  knitr::kable() # datatable()
+  knitr::kable()
             
 ```
 
@@ -679,34 +667,22 @@ names(state_weights) <- c(state_elec_results$state)
 ev_state <- state_elec_results$ev
 names(ev_state) <- state_elec_results$state
 
-# makes priors
-national_mu_prior <- 0.502
+# read in prior
+prior_in <- read_csv("data/state_priors_08_12_16.csv") %>%
+  filter(date <= RUN_DATE) %>%
+  group_by(state) %>%
+  arrange(date) %>%
+  filter(date == max(date)) %>%
+  select(state,pred) %>%
+  ungroup() %>%
+  arrange(state)
 
-# Mean of the mu_b_prior
-mu_b_prior <- logit(national_mu_prior + prior_diff_score)
+mu_b_prior <- logit(prior_in$pred)
+names(mu_b_prior) <- prior_in$state
+names(mu_b_prior) == names(prior_diff_score) # correct order?
+national_mu_prior <- weighted.mean(inv.logit(mu_b_prior), state_weights)
 
-# etc
-# sigmas
-tibble(sigma_national = rstan::extract(out, pars = "sigma_a")[[1]],
-       sigma_state = rstan::extract(out, pars = "sigma_b")[[1]]) %>%
-  gather(parameter,value) %>%
-  ggplot(.,aes(x=value)) +
-  geom_histogram(binwidth=0.001) +
-  facet_grid(rows=vars(parameter))
-# measurement noise
-measure_noise_national <- rstan::extract(out, pars = "measure_noise_national")[[1]] * mean(rstan::extract(out, pars = "sigma_measure_noise_national")[[1]])
-hist(measure_noise_national)
-# look at variation in mu_a
-mu_a <- rstan::extract(out, pars = "mu_a")[[1]]
-lapply(1:100,
-       function(x){
-         tibble(mu_a_draw = inv.logit(mu_a[x,]),
-                trial = x) %>%
-           mutate(date = min(df$end) + row_number()) 
-       }) %>%
-  do.call('bind_rows',.) %>%
-  ggplot(.,aes(x=date,y=mu_a_draw,group=trial)) +
-  geom_line(alpha=0.2)
+
 # extract predictions
 predicted_score <- rstan::extract(out, pars = "predicted_score")[[1]]
 
@@ -817,42 +793,44 @@ natl_polls.2012.gg <- pct_obama %>%
   geom_ribbon(aes(ymin=low,ymax=high),col=NA,alpha=0.2) +
   geom_hline(yintercept = 0.5) +
   geom_hline(yintercept = national_mu_prior,linetype=2) +
-  geom_point(aes(y=pct_obama),alpha=0.2) +
-  geom_smooth(aes(y=pct_obama),method='loess',span=0.2,col='black',linetype=2,se=F) +
+  geom_point(aes(y=pct_obama),alpha=0.3) +
   geom_line(aes(y=mean)) +
   facet_wrap(~state) +
   theme_minimal()  +
   theme(legend.position = 'none') +
   scale_x_date(limits=c(ymd('2012-03-01','2012-11-06')),date_breaks='1 month',date_labels='%b') +
-  scale_y_continuous(breaks=seq(0,1,0.02)) +
-  labs(subtitle='pct_obama national')
+  scale_y_continuous(breaks=seq(0,1,0.02)) + 
+  labs(subtitletitle=sprintf('obama natl pct | mean = %s | p(win) = %s',
+                             round(pct_obama[pct_obama$state=='--' & pct_obama$t==election_day,]$mean*100,1),
+                             round(pct_obama[pct_obama$state=='--' & pct_obama$t==election_day,]$prob,2)))
 
 natl_evs.2012.gg <-  ggplot(sim_evs, aes(x=t)) +
   geom_hline(yintercept = 270) +
-  geom_line(aes(y=mean_dem_ev)) +
-  geom_line(aes(y=median_dem_ev),linetype=2) +
+  geom_line(aes(y=median_dem_ev)) +
   geom_ribbon(aes(ymin=low_dem_ev,ymax=high_dem_ev),alpha=0.2) +
   theme_minimal()  +
   theme(legend.position = 'none') +
   scale_x_date(limits=c(ymd('2012-03-01','2012-11-06')),date_breaks='1 month',date_labels='%b') +
-  scale_y_continuous(breaks=seq(0,600,100)) +
-  labs(subtitletitle='obama evs')
+  labs(subtitletitle=sprintf('obama evs | median = %s | p(win) = %s',
+                             round(sim_evs[sim_evs$t==election_day,]$median_dem_ev),
+                             round(sim_evs[sim_evs$t==election_day,]$prob,2)))
 
 state_polls.2012.gg <- pct_obama %>%
   filter(state %in% ex_states) %>%
-  left_join(df %>% select(state,t,pct_obama)) %>% # plot over time
-  # plot
+  left_join(df %>% select(state,t,pct_obama)) %>% 
+  left_join(tibble(state = names(mu_b_prior),
+                   prior = inv.logit(mu_b_prior)) ) %>%
   ggplot(.,aes(x=t,col=state)) +
   geom_ribbon(aes(ymin=low,ymax=high),col=NA,alpha=0.2) +
   geom_hline(yintercept = 0.5) +
-  geom_point(aes(y=pct_obama),alpha=0.2) +
-  #geom_smooth(aes(y=pct_obama,col=state),method='loess',linetype=2,se=F) +
+  geom_hline(aes(yintercept = prior),linetype=2) +
+  geom_point(aes(y=pct_obama),alpha=0.3) +
   geom_line(aes(y=mean)) +
   facet_wrap(~state) +
   theme_minimal()  +
-  theme(legend.position = 'none') +
+  theme(legend.position = 'top') +
+  guides(color='none') +
   scale_x_date(limits=c(ymd('2012-03-01','2012-11-06')),date_breaks='1 month',date_labels='%b') +
-  scale_y_continuous(breaks=seq(0,1,0.05)) +
   labs(subtitle='pct_obama state')
 
 
@@ -993,13 +971,13 @@ final_evs.2012.gg <-  ggplot(final_evs,aes(x=dem_ev,
 map.2012.gg
 ```
 
-#### Final electoral-college histogram
+#### Final electoral college histogram
 
 ```{r echo=F,message=F,warning=F}
 final_evs.2012.gg
 ```
 
-#### National and state polling averages and the electoral college "now-cast" over time
+#### National and state polls and the electoral college over time
 
 ```{r echo=F,message=F,warning=F,fig.width = 9, fig.asp = .62}
 grid.arrange(natl_polls.2012.gg, natl_evs.2012.gg, state_polls.2012.gg, 
@@ -1009,7 +987,7 @@ grid.arrange(natl_polls.2012.gg, natl_evs.2012.gg, state_polls.2012.gg,
 )
 ```
 
-#### States' partisan leans over time
+#### State vs national deltas over time
 
 ```{r echo=F,message=F,warning=F}
 state_lean.2012.gg
@@ -1044,7 +1022,7 @@ pct_obama %>%
          se = round(se,3)) %>%
   select(state,mean,low,high,prob,se) %>%
   arrange(abs(mean-0.5)) %>%
-  knitr::kable() # datatable()
+  knitr::kable()
             
 ```
 
@@ -1186,35 +1164,22 @@ names(state_weights) <- c(state_elec_results$state)
 ev_state <- state_elec_results$ev
 names(ev_state) <- state_elec_results$state
 
-# makes priors
-national_mu_prior <- 0.506
+# read in prior
+prior_in <- read_csv("data/state_priors_08_12_16.csv") %>%
+  filter(date <= RUN_DATE) %>%
+  group_by(state) %>%
+  arrange(date) %>%
+  filter(date == max(date)) %>%
+  select(state,pred) %>%
+  ungroup() %>%
+  arrange(state)
 
-# Mean of the mu_b_prior
-mu_b_prior <- logit(national_mu_prior + prior_diff_score)
+mu_b_prior <- logit(prior_in$pred)
+names(mu_b_prior) <- prior_in$state
+names(mu_b_prior) == names(prior_diff_score) # correct order?
+national_mu_prior <- weighted.mean(inv.logit(mu_b_prior), state_weights)
 
-# etc
-hist(a)
-# sigmas
-tibble(sigma_national = rstan::extract(out, pars = "sigma_a")[[1]],
-       sigma_state = rstan::extract(out, pars = "sigma_b")[[1]]) %>%
-  gather(parameter,value) %>%
-  ggplot(.,aes(x=value)) +
-  geom_histogram(binwidth=0.001) +
-  facet_grid(rows=vars(parameter))
-# measurement noise
-measure_noise_national <- rstan::extract(out, pars = "measure_noise_national")[[1]] * mean(rstan::extract(out, pars = "sigma_measure_noise_national")[[1]])
-hist(measure_noise_national)
-# look at variation in mu_a
-mu_a <- rstan::extract(out, pars = "mu_a")[[1]]
-lapply(1:100,
-       function(x){
-         tibble(mu_a_draw = inv.logit(mu_a[x,]),
-                trial = x) %>%
-           mutate(date = min(df$end) + row_number()) 
-       }) %>%
-  do.call('bind_rows',.) %>%
-  ggplot(.,aes(x=date,y=mu_a_draw,group=trial)) +
-  geom_line(alpha=0.2)
+
 # extract predictions
 predicted_score <- rstan::extract(out, pars = "predicted_score")[[1]]
 
@@ -1225,8 +1190,8 @@ pct_clinton <- pblapply(1:dim(predicted_score)[3],
                       temp <- predicted_score[,,x]
                       
                       # put in tibble
-                      tibble(low = apply(temp,2,function(x){(quantile(x,0.05))}),
-                             high = apply(temp,2,function(x){(quantile(x,0.95))}),
+                      tibble(low = apply(temp,2,function(x){(quantile(x,0.025))}),
+                             high = apply(temp,2,function(x){(quantile(x,0.975))}),
                              mean = apply(temp,2,function(x){(mean(x))}),
                              prob = apply(temp,2,function(x){(mean(x>0.5))}),
                              state = x) 
@@ -1255,8 +1220,8 @@ pct_clinton_natl <- pblapply(1:dim(predicted_score)[2],
 
 pct_clinton_natl <- pct_clinton_natl %>%
   group_by(t) %>%
-  summarise(low = quantile(natl_vote,0.05),
-            high = quantile(natl_vote,0.95),
+  summarise(low = quantile(natl_vote,0.025),
+            high = quantile(natl_vote,0.975),
             mean = mean(natl_vote),
             prob = mean(natl_vote > 0.5)) %>%
   mutate(state = '--')
@@ -1268,7 +1233,7 @@ pct_clinton <- pct_clinton %>%
 
 # look
 ex_states <- c('IA','FL','OH','WI','MI','PA','AZ','NC','NH','TX','GA','MN')
-pct_clinton %>% filter(t == RUN_DATE,state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/1.68) %>% dplyr::select(-t)
+pct_clinton %>% filter(t == RUN_DATE,state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/1.96) %>% dplyr::select(-t)
 
 map.2016.gg <- urbnmapr::states %>%
   left_join(pct_clinton %>% filter(t == max(t)) %>%
@@ -1319,48 +1284,50 @@ identifier <- paste0(Sys.Date()," || " , out@model_name)
 
 natl_polls.2016.gg <- pct_clinton %>%
   filter(state == '--') %>%
-  left_join(df %>% select(state,t,pct_clinton)) %>% # plot over time
+  left_join(df %>% select(state,t,pct_clinton,method)) %>% # plot over time
   # plot
   ggplot(.,aes(x=t)) +
   geom_ribbon(aes(ymin=low,ymax=high),col=NA,alpha=0.2) +
   geom_hline(yintercept = 0.5) +
   geom_hline(yintercept = national_mu_prior,linetype=2) +
-  geom_point(aes(y=pct_clinton),alpha=0.2) +
-  geom_smooth(aes(y=pct_clinton),method='loess',span=0.2,col='black',linetype=2,se=F) +
+  geom_point(aes(y=pct_clinton,shape=method),alpha=0.3) +
   geom_line(aes(y=mean)) +
   facet_wrap(~state) +
   theme_minimal()  +
   theme(legend.position = 'none') +
   scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b') +
-  scale_y_continuous(breaks=seq(0,1,0.02)) +
-  labs(subtitle='pct_clinton national')
+  scale_y_continuous(breaks=seq(0,1,0.02)) + 
+  labs(subtitletitle=sprintf('clinton natl pct | mean = %s | p(win) = %s',
+                             round(pct_clinton[pct_clinton$state=='--' & pct_clinton$t==election_day,]$mean*100,1),
+                             round(pct_clinton[pct_clinton$state=='--' & pct_clinton$t==election_day,]$prob,2)))
 
 natl_evs.2016.gg <-  ggplot(sim_evs, aes(x=t)) +
   geom_hline(yintercept = 270) +
-  geom_line(aes(y=mean_dem_ev)) +
-  geom_line(aes(y=median_dem_ev),linetype=2) +
+  geom_line(aes(y=median_dem_ev)) +
   geom_ribbon(aes(ymin=low_dem_ev,ymax=high_dem_ev),alpha=0.2) +
   theme_minimal()  +
   theme(legend.position = 'none') +
   scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b') +
-  scale_y_continuous(breaks=seq(0,600,100)) +
-  labs(subtitletitle='clinton evs')
+  labs(subtitletitle=sprintf('clinton evs | median = %s | p(win) = %s',
+                             round(sim_evs[sim_evs$t==election_day,]$median_dem_ev),
+                             round(sim_evs[sim_evs$t==election_day,]$prob,2)))
 
 state_polls.2016.gg <- pct_clinton %>%
   filter(state %in% ex_states) %>%
-  left_join(df %>% select(state,t,pct_clinton)) %>% # plot over time
-  # plot
+  left_join(df %>% select(state,t,pct_clinton,method)) %>% 
+  left_join(tibble(state = names(mu_b_prior),
+                   prior = inv.logit(mu_b_prior)) ) %>%
   ggplot(.,aes(x=t,col=state)) +
   geom_ribbon(aes(ymin=low,ymax=high),col=NA,alpha=0.2) +
   geom_hline(yintercept = 0.5) +
-  geom_point(aes(y=pct_clinton),alpha=0.2) +
-  #geom_smooth(aes(y=pct_clinton,col=state),method='loess',linetype=2,se=F) +
+  geom_hline(aes(yintercept = prior),linetype=2) +
+  geom_point(aes(y=pct_clinton,shape=method),alpha=0.3) +
   geom_line(aes(y=mean)) +
   facet_wrap(~state) +
   theme_minimal()  +
-  theme(legend.position = 'none') +
+  theme(legend.position = 'top') +
+  guides(color='none') +
   scale_x_date(limits=c(ymd('2016-03-01','2016-11-08')),date_breaks='1 month',date_labels='%b') +
-  scale_y_continuous(breaks=seq(0,1,0.05)) +
   labs(subtitle='pct_clinton state')
 
 
@@ -1499,13 +1466,13 @@ final_evs.2016.gg <-  ggplot(final_evs,aes(x=dem_ev,
 map.2016.gg
 ```
 
-#### Final electoral-college histogram
+#### Final electoral college histogram
 
 ```{r echo=F,message=F,warning=F}
 final_evs.2016.gg
 ```
 
-#### National and state polling averages and the electoral college "now-cast" over time
+#### National and state polls and the electoral college over time
 
 ```{r echo=F,message=F,warning=F,fig.width = 9, fig.asp = .62}
 grid.arrange(natl_polls.2016.gg, natl_evs.2016.gg, state_polls.2016.gg, 
@@ -1515,7 +1482,7 @@ grid.arrange(natl_polls.2016.gg, natl_evs.2016.gg, state_polls.2016.gg,
 )
 ```
 
-#### States' partisan leans over time
+#### State vs national deltas over time
 
 ```{r echo=F,message=F,warning=F}
 state_lean.2016.gg
@@ -1548,7 +1515,7 @@ pct_clinton %>%
          se = round(se,3)) %>%
   select(state,mean,low,high,prob,se) %>%
   arrange(abs(mean-0.5)) %>%
-  knitr::kable() # datatable()
+  knitr::kable()
             
 ```
 
@@ -1573,11 +1540,16 @@ calibration.gg <- ggplot(calibration_data, aes(x=prob,y=ifelse(actual>0.5,1,0),
   geom_abline()  +
   scale_x_continuous(breaks=seq(0,1,0.1)) +
   scale_y_continuous(breaks=seq(0,1,0.1)) +
-  theme_minimal()
+  theme_minimal() + 
+  theme(panel.grid.minor = element_blank()) +
+  labs(x='Predicted Democratic win probability on election-day',
+       y='Result (1 = Dem win, 0 = Rep)')
+
 
 print(calibration.gg)
 
 ```
+
 
 # Licence
 
