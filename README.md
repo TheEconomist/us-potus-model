@@ -1,6 +1,6 @@
 State and national presidential election forecasting model
 ================
-Last update on Sunday August 02, 2020 at 12:22 PM EDT
+Last update on Sunday August 02, 2020 at 06:21 PM EDT
 
 Code for a dynamic multilevel Bayesian model to predict US presidential
 elections. Written in R and Stan.
@@ -284,7 +284,7 @@ Here is a graphical summary of the model’s performance in 2008, 2012 and
 | PA    | 0.513 | 0.467 | 0.561 | 0.702 | 0.029 |
 | MI    | 0.515 | 0.467 | 0.561 | 0.724 | 0.028 |
 | NH    | 0.515 | 0.467 | 0.562 | 0.728 | 0.028 |
-| –     | 0.515 | 0.480 | 0.546 | 0.843 | 0.019 |
+| –     | 0.516 | 0.478 | 0.544 | 0.870 | 0.016 |
 | CO    | 0.517 | 0.470 | 0.561 | 0.775 | 0.026 |
 | OH    | 0.482 | 0.432 | 0.529 | 0.218 | 0.028 |
 | WI    | 0.521 | 0.473 | 0.568 | 0.809 | 0.028 |
