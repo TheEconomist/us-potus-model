@@ -115,7 +115,7 @@ transformed parameters {
 model {
   //*** priors
   raw_mu_b_T ~ std_normal();
-  mu_b_T_model_estimation_error ~ scaled_inv_chi_square(6, 1);
+  //mu_b_T_model_estimation_error ~ scaled_inv_chi_square(7, 1);
   to_vector(raw_mu_b) ~ std_normal();
   raw_mu_c ~ std_normal();
   //raw_mu_m ~ std_normal();

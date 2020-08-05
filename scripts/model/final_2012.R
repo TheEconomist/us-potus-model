@@ -3,9 +3,9 @@
 
 ## Setup
 #rm(list = ls())
-options(mc.cores = 4)
-n_chains <- 4
-n_cores <- 4
+options(mc.cores = 6)
+n_chains <- 6
+n_cores <- 6
 n_sampling <- 500
 n_warmup <- 500
 n_refresh <- n_sampling*0.1
@@ -64,7 +64,7 @@ check_cov_matrix <- function(mat,wt=state_weights){
 
 ## Master variables
 RUN_DATE <- ymd("2012-11-06")
-#RUN_DATE <- ymd("2012-07-30")
+#RUN_DATE <- ymd("2012-08-04")
 
 election_day <- ymd("2012-11-06")
 start_date <- as.Date("2012-03-01") # Keeping all polls after March 1, 2012
@@ -264,9 +264,37 @@ state_data_long <- state_data %>%
   ungroup() %>%
   select(-variable)
 
-# save correlation for polls
-state_correlation_polling <- cor(state_data_long)  
-state_correlation_polling[state_correlation_polling < 0.3] <- 0.3 # baseline cor for national poll error
+# compute the correlation matrix
+# formula is
+# a*(lambda*C + (1-lambda)*C_1)
+# where C is our correlation matrix with min 0
+# and C_1 is a sq matrix with all 1's
+# lambda=0 is 100% correlation, lambda=1 is our corr matrix
+
+# save correlation 
+C <- cor(state_data_long)  
+
+# increase the baseline correlation of the matrix to correspond to national-level error
+C[C < 0] <- 0 # baseline cor for national poll error
+
+
+tmp_C <- C
+diag(tmp_C) <- NA
+mean(tmp_C,na.rm=T)
+
+# mixing with matrix of 0.5s
+lambda <- 0.75
+C_1 <- matrix(data=1,nrow = 51,ncol=51)
+a <- 1
+new_C <- (lambda*C + (1-lambda)*C_1) %>% make.positive.definite()
+
+tmp <- new_C
+diag(tmp) <- NA
+mean(tmp,na.rm=T)
+
+state_correlation_polling <- new_C
+
+# make pos definite
 state_correlation_polling <- make.positive.definite(state_correlation_polling)
 
 # covariance matrix for polling error
@@ -277,14 +305,14 @@ state_covariance_polling_bias <- state_covariance_polling_bias * state_correlati
 mean(apply(MASS::mvrnorm(100,rep(0,51),state_covariance_polling_bias),2,sd) /4) 
 
 # covariance for prior e-day prediction
-state_covariance_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.17^2, rho = 0.9) # 6% on elec day
+state_covariance_mu_b_T <- cov_matrix(n = 51, sigma2 = 0.18^2, rho = 0.9) # 6% on elec day
 state_covariance_mu_b_T <- state_covariance_mu_b_T * state_correlation_polling
 
 (sqrt(t(state_weights) %*% state_covariance_mu_b_T %*% state_weights) / 4)
 mean(apply(MASS::mvrnorm(100,rep(0,51),state_covariance_mu_b_T),2,sd) /4) 
 
 # covariance matrix for random walks
-state_covariance_mu_b_walk <- cov_matrix(51, (0.016)^2, 0.9)
+state_covariance_mu_b_walk <- cov_matrix(51, (0.017)^2, 0.9)
 state_covariance_mu_b_walk <- state_covariance_mu_b_walk * state_correlation_polling # we want the demo correlations for filling in gaps in the polls
 
 (sqrt(t(state_weights) %*% state_covariance_mu_b_walk %*% state_weights) / 4) * sqrt(300)
@@ -296,7 +324,7 @@ mean(apply(MASS::mvrnorm(100,rep(0,51),state_covariance_mu_b_walk),2,sd) /4) * s
 # (1) the national sd on the polls, (2) the national sd
 # on the prior and (3) the national sd of the random walk
 # make initial covariance matrix (using specified correlation)
-state_covariance_0 <- cov_matrix(51, 0.078^2, 0.9)
+state_covariance_0 <- cov_matrix(51, 0.07^2, 0.9)
 state_covariance_0 <- state_covariance_0 * state_correlation_polling # we want the demo correlations for filling in gaps in the polls
 
 # national error of:
@@ -312,7 +340,7 @@ fit_rmse_day_x(0:300)
 days_til_election <- as.numeric(difftime(election_day,RUN_DATE))
 expected_national_mu_b_T_error <- fit_rmse_day_x(days_til_election)
 
-polling_bias_scale <- 0.014 # on the probability scale -- we convert later down
+polling_bias_scale <- 0.013 # on the probability scale -- we convert later down
 mu_b_T_scale <- expected_national_mu_b_T_error # on the probability scale -- we convert later down
 random_walk_scale <- 0.05/sqrt(300) # on the probability scale -- we convert later down
 
@@ -328,30 +356,6 @@ sqrt(t(state_weights) %*% ss_cov_mu_b_T %*% state_weights) / 4
 sqrt(t(state_weights) %*% ss_cov_mu_b_walk %*% state_weights) / 4 * sqrt(300)
 
 
-
-# a*(lambda*C + (1-lambda)*C_1)
-# where C is our correlation matrix with min 0
-# and C_1 is a sq matrix with all 1's
-# lambda=0 is 100% correlation, lambda=1 is our corr matrix
-C <-  cor(state_data_long)  
-C[C < 0] <- 0 
-
-tmp_C <- C
-diag(tmp_C) <- NA
-mean(tmp_C,na.rm=T)
-
-lambda <- 0.5
-C_1 <- matrix(data=1,nrow = 51,ncol=51)
-a <- 1
-nat_vote_scale <- 0.01
-new_C <- nat_vote_scale*(lambda*C + (1-lambda)*C_1) %>% make.positive.definite()
-
-tmp <- cov2cor(new_C)
-diag(tmp) <- NA
-mean(tmp,na.rm=T)
-
-sqrt(t(state_weights) %*% new_C %*% state_weights) / 4
-mean(apply(MASS::mvrnorm(1000,rep(0,51),new_C),2,sd) /4)  
 
 # checking parameters -----------------------------------------------------
 par(mfrow=c(3,2), mar=c(3,3,1,1), mgp=c(1.5,.5,0), tck=-.01)
@@ -419,7 +423,7 @@ prior_in <- read_csv("data/state_priors_08_12_16.csv") %>%
   ungroup() %>%
   arrange(state)
 
-mu_b_prior <- logit(prior_in$pred)
+mu_b_prior <- logit(prior_in$pred + 0.0)
 names(mu_b_prior) <- prior_in$state
 names(mu_b_prior) == names(prior_diff_score) # correct order?
 

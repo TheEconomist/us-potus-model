@@ -82,7 +82,7 @@ transformed parameters {
   vector[N_state_polls] logit_pi_democrat_state;
   vector[N_national_polls] logit_pi_democrat_national;
   //*** construct parameters
-  mu_b[:,T] = cholesky_ss_cov_mu_b_T * raw_mu_b_T + mu_b_prior;   // * mu_b_T_model_estimation_error 
+  mu_b[:,T] = cholesky_ss_cov_mu_b_T * raw_mu_b_T + mu_b_prior;  // * mu_b_T_model_estimation_error 
   for (i in 1:(T-1)) mu_b[:, T - i] = cholesky_ss_cov_mu_b_walk * raw_mu_b[:, T - i] + mu_b[:, T + 1 - i];
   national_mu_b_average = transpose(mu_b) * state_weights;
   mu_c = raw_mu_c * sigma_c;
@@ -115,7 +115,7 @@ transformed parameters {
 model {
   //*** priors
   raw_mu_b_T ~ std_normal();
-  mu_b_T_model_estimation_error ~ scaled_inv_chi_square(6, 1);
+  //mu_b_T_model_estimation_error ~ scaled_inv_chi_square(7, 1);
   to_vector(raw_mu_b) ~ std_normal();
   raw_mu_c ~ std_normal();
   raw_mu_m ~ std_normal();
