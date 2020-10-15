@@ -19,7 +19,8 @@ library(ggrepel)
 library(DT)
 
 # final model version
-# source('scripts/model/final_2016.R');source('scripts/model/final_2012.R');source('scripts/model/final_2008.R');rmarkdown::render('model_summary.Rmd',output_file = 'model_reports/v4_cov_error_rewrite');beepr::beep(2);
+# source('scripts/model/final_2016.R');source('scripts/model/final_2012.R');source('scripts/model/final_2008.R');beepr::beep(2);
+# rmarkdown::render('model_summary.Rmd',output_file = 'model_reports/v4_cov_error_rewrite')
 ```
 
 ## Model performance {.tabset .tabset-fade}

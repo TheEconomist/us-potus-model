@@ -41,6 +41,9 @@ library(pbapply)
 library(urbnmapr)
 library(ggrepel)
 library(DT)
+
+#  source('scripts/model/final_2016.R');source('scripts/model/final_2012.R');source('scripts/model/final_2008.R');beepr::beep(2);
+
 ```
 
 
@@ -57,7 +60,7 @@ start_date <- as.Date("2008-03-01") # Keeping all polls after March 1, 2016
 evs_df <- read_csv('data/2012.csv')
 
 # will read in the most recent back-test for 2008
-out  <- read_rds(sprintf('models/backtest_2008/stan_model_%s.rds',RUN_DATE))
+out  <- read_rds(sprintf('models/backtest_2008/stan_model_%s_normal_final.rds',RUN_DATE))
 
 # get all the polling data
 #setwd(here("data/"))
@@ -208,8 +211,8 @@ pct_obama <- pblapply(1:dim(predicted_score)[3],
                       temp <- predicted_score[,,x]
                       
                       # put in tibble
-                      tibble(low = apply(temp,2,function(x){(quantile(x,0.05))}),
-                             high = apply(temp,2,function(x){(quantile(x,0.95))}),
+                      tibble(low = apply(temp,2,function(x){(quantile(x,0.025))}),
+                             high = apply(temp,2,function(x){(quantile(x,0.975))}),
                              mean = apply(temp,2,function(x){(mean(x))}),
                              prob = apply(temp,2,function(x){(mean(x>0.5))}),
                              state = x) 
@@ -238,8 +241,8 @@ pct_obama_natl <- pblapply(1:dim(predicted_score)[2],
 
 pct_obama_natl <- pct_obama_natl %>%
   group_by(t) %>%
-  summarise(low = quantile(natl_vote,0.05),
-            high = quantile(natl_vote,0.95),
+  summarise(low = quantile(natl_vote,0.025),
+            high = quantile(natl_vote,0.975),
             mean = mean(natl_vote),
             prob = mean(natl_vote > 0.5)) %>%
   mutate(state = '--')
@@ -251,7 +254,7 @@ pct_obama <- pct_obama %>%
 
 # look
 ex_states <- c('IA','FL','OH','WI','MI','PA','AZ','NC','NH','TX','GA','MN')
-pct_obama %>% filter(t == RUN_DATE,state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/1.68) %>% dplyr::select(-t)
+pct_obama %>% filter(t == RUN_DATE,state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/1.96) %>% dplyr::select(-t)
 
 map.2008.gg <- urbnmapr::states %>%
   left_join(pct_obama %>% filter(t == max(t)) %>%
@@ -473,6 +476,32 @@ final_evs.2008.gg <-  ggplot(final_evs,aes(x=dem_ev,
          subtitle=sprintf("p(dem win) = %s | full stan model",round(mean(final_evs$dem_ev>=270),3)))
 
 
+
+# get the p value of the actual results
+p_values_2008 <- draws %>% 
+  filter(state != '--',
+         t == election_day) %>% 
+  left_join(politicaldata::pres_results %>% filter(year == 2008) %>%
+              mutate(actual = dem/(dem+rep)) %>%
+              dplyr::select(state,actual)) %>%
+  group_by(state) %>%
+  summarise(high = quantile(pct_obama, 0.975),
+            low = quantile(pct_obama, 0.025),
+            mean = mean(pct_obama),
+            prob = mean(pct_obama > 0.5),
+            actual = unique(actual),
+            p_value = 
+           ( 2*sum(pct_obama < actual) + 1 ) /
+           ( 2 * n() + 2) #,
+           # p_value_2 = mean(ifelse(actual >= mean(pct_obama),
+           #                         pct_obama >= actual,
+           #                         pct_obama <= actual))
+           ) %>%
+  arrange(p_value) %>% 
+  mutate(year = 2008,
+         outside_ci = ifelse(actual > high | actual < low, TRUE,FALSE))
+
+
 ```
 
 #### Map
@@ -547,7 +576,7 @@ start_date <- as.Date("2012-03-01") # Keeping all polls after March 1, 2016
 evs_df <- read_csv('data/2012.csv')
 
 # will read in the most recent back-test for 2012
-out  <- read_rds(sprintf('models/backtest_2012/stan_model_%s.rds',RUN_DATE))
+out  <- read_rds(sprintf('models/backtest_2012/stan_model_%s_normal_final.rds',RUN_DATE))
 
 # get all the polling data
 #setwd(here("data/"))
@@ -693,8 +722,8 @@ pct_obama <- pblapply(1:dim(predicted_score)[3],
                       temp <- predicted_score[,,x]
                       
                       # put in tibble
-                      tibble(low = apply(temp,2,function(x){(quantile(x,0.05))}),
-                             high = apply(temp,2,function(x){(quantile(x,0.95))}),
+                      tibble(low = apply(temp,2,function(x){(quantile(x,0.025))}),
+                             high = apply(temp,2,function(x){(quantile(x,0.975))}),
                              mean = apply(temp,2,function(x){(mean(x))}),
                              prob = apply(temp,2,function(x){(mean(x>0.5))}),
                              state = x) 
@@ -723,8 +752,8 @@ pct_obama_natl <- pblapply(1:dim(predicted_score)[2],
 
 pct_obama_natl <- pct_obama_natl %>%
   group_by(t) %>%
-  summarise(low = quantile(natl_vote,0.05),
-            high = quantile(natl_vote,0.95),
+  summarise(low = quantile(natl_vote,0.025),
+            high = quantile(natl_vote,0.975),
             mean = mean(natl_vote),
             prob = mean(natl_vote > 0.5)) %>%
   mutate(state = '--')
@@ -736,7 +765,7 @@ pct_obama <- pct_obama %>%
 
 # look
 ex_states <- c('IA','FL','OH','WI','MI','PA','AZ','NC','NH','TX','GA','MN')
-pct_obama %>% filter(t == RUN_DATE,state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/1.68) %>% dplyr::select(-t)
+pct_obama %>% filter(t == RUN_DATE,state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/1.96) %>% dplyr::select(-t)
 
 map.2012.gg <- urbnmapr::states %>%
   left_join(pct_obama %>% filter(t == max(t)) %>%
@@ -962,6 +991,33 @@ final_evs.2012.gg <-  ggplot(final_evs,aes(x=dem_ev,
          subtitle=sprintf("p(dem win) = %s | full stan model",round(mean(final_evs$dem_ev>=270),3)))
 
 
+
+
+# get the p value of the actual results
+p_values_2012 <- draws %>% 
+  filter(state != '--',
+         t == election_day) %>% 
+  left_join(politicaldata::pres_results %>% filter(year == 2012) %>%
+              mutate(actual = dem/(dem+rep)) %>%
+              dplyr::select(state,actual)) %>%
+  group_by(state) %>%
+  summarise(high = quantile(pct_obama, 0.975),
+            low = quantile(pct_obama, 0.025),
+            mean = mean(pct_obama),
+            prob = mean(pct_obama > 0.5),
+            actual = unique(actual),
+            p_value = 
+           ( 2*sum(pct_obama < actual) + 1 ) /
+           ( 2 * n() + 2) #,
+           # p_value_2 = mean(ifelse(actual >= mean(pct_obama),
+           #                         pct_obama >= actual,
+           #                         pct_obama <= actual))
+           ) %>%
+  arrange(p_value) %>% 
+  mutate(year = 2012,
+         outside_ci = ifelse(actual > high | actual < low, TRUE,FALSE))
+
+
 ```
 
 
@@ -1038,7 +1094,7 @@ start_date <- as.Date("2016-03-01") # Keeping all polls after March 1, 2016
 evs_df <- read_csv('data/2012.csv')
 
 # will read in the most recent back-test for 2012
-out  <- read_rds(sprintf('models/stan_model_%s.rds',RUN_DATE))
+out  <- read_rds(sprintf('models/stan_model_%s_normal_final.rds',RUN_DATE))
 
 # get all the polling data
 #setwd(here("data/"))
@@ -1457,6 +1513,34 @@ final_evs.2016.gg <-  ggplot(final_evs,aes(x=dem_ev,
          subtitle=sprintf("p(dem win) = %s | full stan model",round(mean(final_evs$dem_ev>=270),3)))
 
 
+
+
+# get the p value of the actual results
+p_values_2016 <- draws %>% 
+  filter(state != '--',
+         t == election_day) %>% 
+  left_join(politicaldata::pres_results %>% filter(year == 2016) %>%
+              mutate(actual = dem/(dem+rep)) %>%
+              dplyr::select(state,actual)) %>%
+  group_by(state) %>%
+  summarise(high = quantile(pct_clinton, 0.975),
+            low = quantile(pct_clinton, 0.025),
+            mean = mean(pct_clinton),
+            prob = mean(pct_clinton > 0.5),
+            actual = unique(actual),
+            p_value = 
+           ( 2*sum(pct_clinton < actual) + 1 ) /
+           ( 2 * n() + 2) #,
+           # p_value_2 = mean(ifelse(actual >= mean(pct_clinton),
+           #                         pct_clinton >= actual,
+           #                         pct_clinton <= actual))
+           ) %>%
+  arrange(p_value) %>% 
+  mutate(year = 2016,
+         outside_ci = ifelse(actual > high | actual < low, TRUE,FALSE))
+
+
+
 ```
 
 
@@ -1523,7 +1607,7 @@ pct_clinton %>%
 
 ## Cumulative charts
 
-### Calibration plot
+### Probability calibration plot
 
 ```{r echo=F,message=F,warning=F}
 calibration_data <- model_v_actual.2016 %>% mutate(year = 2016) %>%
@@ -1548,6 +1632,63 @@ calibration.gg <- ggplot(calibration_data, aes(x=prob,y=ifelse(actual>0.5,1,0),
 
 print(calibration.gg)
 
+```
+
+
+### Confidence interval coverage
+
+```{r echo=F, message=FALSE, warning=FALSE}
+
+calibration_data <-  p_values_2016 %>% mutate(year = 2016) %>%
+        bind_rows(p_values_2012 %>% mutate(year = 2012) ) %>%
+        bind_rows(p_values_2008 %>% mutate(year = 2008)) %>%
+  filter(state != 'DC')
+
+
+# sum(calibration_data$outside_ci) / nrow(calibration_data)
+
+p_value_hist.gg <- ggplot(calibration_data, aes(x=p_value)) +
+  geom_histogram(binwidth = 0.01,aes(group=paste0(state,year))) +
+  geom_vline(xintercept = 0.025,col='red',linetype=2) +
+  geom_vline(xintercept = 0.975,col='red',linetype=2) +
+  scale_x_continuous(breaks=seq(0,1,0.05))  +
+  scale_y_continuous(breaks=seq(0,100,2))  +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank())
+
+
+preds_p_value_scatter.gg <- ggplot(calibration_data, aes(x=mean*100,y=actual*100)) +
+  geom_abline() +
+  # states inside the ci
+  geom_point(data =. %>% filter(!outside_ci),col='black') +
+  # states outside
+  geom_point(data = . %>% filter(outside_ci),col='red') +
+  geom_text_repel(data = . %>% filter(outside_ci),
+              aes(label=state),col='red',min.segment.length = 0) +
+  geom_segment(data = . %>% filter(outside_ci),
+               aes(x=mean*100,xend=mean*100,y=low*100,yend=high*100),col='red') +
+  facet_wrap(~year,ncol=3) +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank()) +
+  labs(
+    # title='Model with normal(0, sigma) distributions for polling error and state priors',
+    subtitle='Results in highlighted states fall outside our uncertainty intervals',
+    x='Predicted Democratic share of the two-party vote',
+    y='Actual Democratic share'
+    ) +
+  coord_cartesian(xlim=c(25,75),ylim=c(25,75))
+
+
+
+
+```
+
+```{r echo=F,message=F,warning=F,fig.width = 9, fig.asp = .42}
+print(preds_p_value_scatter.gg)
+```
+
+```{r echo=F,message=F,warning=F}
+print(p_value_hist.gg)
 ```
 
 

@@ -65,7 +65,7 @@ parameters {
   vector[N_national_polls] raw_measure_noise_national;
   vector[N_state_polls] raw_measure_noise_state;
   vector[S] raw_polling_bias; 
-  real mu_b_T_model_estimation_error;
+  // real mu_b_T_model_estimation_error;
 }
 transformed parameters {
   //*** parameters
@@ -114,7 +114,7 @@ transformed parameters {
 
 model {
   //*** priors
-  raw_mu_b_T ~ std_normal();
+  raw_mu_b_T ~  std_normal(); // student_t(4,0,1); // std_normal();
   //mu_b_T_model_estimation_error ~ scaled_inv_chi_square(7, 1);
   to_vector(raw_mu_b) ~ std_normal();
   raw_mu_c ~ std_normal();
@@ -125,7 +125,7 @@ model {
   //raw_e_bias ~ std_normal();
   raw_measure_noise_national ~ std_normal();
   raw_measure_noise_state ~ std_normal();
-  raw_polling_bias ~ std_normal();
+  raw_polling_bias ~  std_normal(); // student_t(4,0,1); // std_normal();
   //*** likelihood
   n_democrat_state ~ binomial_logit(n_two_share_state, logit_pi_democrat_state);
   n_democrat_national ~ binomial_logit(n_two_share_national, logit_pi_democrat_national);

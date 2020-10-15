@@ -64,7 +64,7 @@ check_cov_matrix <- function(mat,wt=state_weights){
 
 ## Master variables
 RUN_DATE <- ymd("2016-11-08")
-#RUN_DATE <- ymd("2016-08-04")
+#RUN_DATE <- ymd("2016-10-19")
 
 election_day <- ymd("2016-11-08")
 start_date <- as.Date("2016-03-01") # Keeping all polls after March 1, 2016
@@ -765,6 +765,25 @@ pct_clinton <- pct_clinton %>%
 ex_states <- c('IA','FL','OH','WI','MI','PA','AZ','NC','NH','NV','GA','MN')
 pct_clinton %>% filter(t == RUN_DATE,state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/1.96) %>% dplyr::select(-t) %>% print
 pct_clinton %>% filter(t == election_day,state %in% c(ex_states,'--')) %>% mutate(se = (high - mean)/1.96) %>% dplyr::select(-t) %>% print
+
+#pct_clinton %>% filter(t == election_day) %>% select(state, clinton=mean) %>% write_csv('~/Desktop/today_2016.csv')
+
+mu_b_t_results_plt <- rbind(mu_b_T_prior_draws, mu_b_T_posterior_draws) %>% 
+  bind_rows(
+    politicaldata::pres_results %>% filter(year == 2016) %>%
+      mutate(mean = dem/(dem+rep)) %>%
+      select(state,mean) %>%
+      mutate(type = 'actual')
+  ) %>%
+  arrange(mean) %>%
+  filter(state != 'DC') %>%
+  ggplot(.) +
+  geom_point(aes(y = mean, x = reorder(state, mean), color = type), position = position_dodge(width = 0.5)) +
+  geom_errorbar(aes(ymin = low, ymax = high, x = state, color = type), width = 0, position = position_dodge(width = 0.5)) +
+  coord_flip() +
+  theme_bw()
+mu_b_t_results_plt
+
 
 map.gg <- urbnmapr::states %>%
   left_join(pct_clinton %>% filter(t == max(t)) %>%

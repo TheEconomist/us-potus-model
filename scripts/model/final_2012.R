@@ -64,7 +64,7 @@ check_cov_matrix <- function(mat,wt=state_weights){
 
 ## Master variables
 RUN_DATE <- ymd("2012-11-06")
-#RUN_DATE <- ymd("2012-08-04")
+#RUN_DATE <- ymd("2012-08-11")
 
 election_day <- ymd("2012-11-06")
 start_date <- as.Date("2012-03-01") # Keeping all polls after March 1, 2012

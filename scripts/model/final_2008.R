@@ -64,7 +64,7 @@ check_cov_matrix <- function(mat,wt=state_weights){
 
 ## Master variables
 RUN_DATE <- ymd("2008-11-03")
-#RUN_DATE <- ymd("2008-08-04")
+#RUN_DATE <- ymd("2008-08-11")
 
 election_day <- ymd("2008-11-03")
 start_date <- as.Date("2008-03-01") # Keeping all polls after March 1, 2008
@@ -433,7 +433,7 @@ names(mu_b_prior) == names(prior_diff_score) # correct order?
 
 national_mu_prior <- weighted.mean(inv.logit(mu_b_prior), state_weights)
 
-cat(sprintf('Prior Clinton two-party vote is %s\nWith a national sd of %s\n', 
+cat(sprintf('Prior Obama two-party vote is %s\nWith a national sd of %s\n', 
             round(national_mu_prior,3),round(mu_b_T_scale,3)))
 
 # The model uses national polls to complement state polls when estimating the national term mu_a.
